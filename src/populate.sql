@@ -1017,6 +1017,17 @@ INSERT INTO OFFICIAL (Person_ID, Duty_Title, Certified_Since, Supervisor_ID) VAL
   (242, 'Info Desk Officer', 2018, 236),  -- GENERATED: official
   (243, 'Info Desk Officer', 2021, 236);  -- GENERATED: official
 
+-- Staff Desk logins: username = first name, demo password 'staff2027' (hash only)
+INSERT INTO STAFF_ACCOUNT (Person_ID, Username, Password_Hash) VALUES
+  (236, 'matti', 'scrypt:32768:8:1$28b096813d5f9377$882ee30069ab51c824396fdd23a42feeecd4dea27af0874693b642bab25776d3e9074b1e6803ed97c632a0473e75862e7468cb56cf95a5cc381cbefc63ff8ba7'),  -- GENERATED: staff login
+  (237, 'riitta', 'scrypt:32768:8:1$f6e47284f118c10b$b30b4f55f9c494785aa6478a472c3e6ee10788cdb470fde851214974857b7986c56841207b9c20f763b579f616cc2b4e242b32a690623bbea0b7bc791a7612f5'),  -- GENERATED: staff login
+  (238, 'juha', 'scrypt:32768:8:1$18f216a757f9e324$1d9aa4e8e9ead31bec9dff630160ffad82bf984c8caed32277a2642da46dd576242097ec64ca098c9380b4483f2c053b835fc7b50abef3ada1c84089a75f41bc'),  -- GENERATED: staff login
+  (239, 'anne', 'scrypt:32768:8:1$190111f9051f0b52$530d751dede8d2124f16ec969ce98eb63a0d38dc97b1a3b0cc96853f63e0693937e6dc59c080156d520f5232e96d0e56886bf449e118b00335d5ca0ac6d1adc9'),  -- GENERATED: staff login
+  (240, 'pekka', 'scrypt:32768:8:1$59764944defef18e$ffe061f1a188055137ead40528e373d0e73061a38c23a9ebcd1c73dcce397a4fad6d3d42e78354d601c60edf33c0929adb8152366744d638775ba4e322be1572'),  -- GENERATED: staff login
+  (241, 'jari', 'scrypt:32768:8:1$b91e0fb486072843$4be80eec6d833acfc145d53174924aa2fb50048b2db7f2024924df01b74eccd60ac4f0800f322718e1fff8dff55319d5f748602a58a98d62b079e7122a8ac28d'),  -- GENERATED: staff login
+  (242, 'sari', 'scrypt:32768:8:1$bbe5fa8bfae8ec74$57accd59d23a611453cd2403b675b406f91ead50cd76bcc7accd9ad00ae7c3cffa9a3568f8312cff81b49d049248584c8a545a52b55dd8e085e3a1153b324545'),  -- GENERATED: staff login
+  (243, 'minna', 'scrypt:32768:8:1$b91b67ddecd88c3e$7da96e2cfacc368d9f9c7952aad1ba5e1d0d99e2ef4592508bf1dc99d764b07d4622244b51a7aec8e0b45f1ed1623fa5d8d928c7450792c3c91faebc2db0d66f');  -- GENERATED: staff login
+
 -- Officials on duty at the 2026 and 2027 races
 INSERT INTO OFFICIATES_IN (Official_ID, Edition_Year, Race_No, Duty) VALUES
   (236, 2026, 4, 'Jury'),  -- GENERATED

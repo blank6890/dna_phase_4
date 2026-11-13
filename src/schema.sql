@@ -71,6 +71,17 @@ CREATE TABLE OFFICIAL (
     CONSTRAINT ck_official_since CHECK (Certified_Since BETWEEN 1950 AND 2100)
 ) ENGINE=InnoDB;
 
+-- Staff Desk login: one account per official (password stored only as a Werkzeug hash)
+CREATE TABLE STAFF_ACCOUNT (
+    Person_ID      INT          NOT NULL,
+    Username       VARCHAR(40)  NOT NULL,
+    Password_Hash  VARCHAR(255) NOT NULL,
+    CONSTRAINT pk_staff_account PRIMARY KEY (Person_ID),
+    CONSTRAINT uq_staff_account_username UNIQUE (Username),
+    CONSTRAINT fk_staff_account_official FOREIGN KEY (Person_ID) REFERENCES OFFICIAL (Person_ID)
+        ON DELETE CASCADE ON UPDATE RESTRICT
+) ENGINE=InnoDB;
+
 CREATE TABLE EDITION (
     Edition_Year           SMALLINT NOT NULL,
     Championship_Level     ENUM('Finnish','World') NOT NULL,

@@ -22,6 +22,14 @@ def h(text: str) -> int:
     return int(hashlib.md5(text.encode("utf8")).hexdigest(), 16)
 
 
+def staff_hash(username: str, password: str = "staff2027") -> str:
+    """Werkzeug-compatible scrypt hash with a deterministic salt (keeps populate.sql reproducible)."""
+    n, r, p = 2**15, 8, 1
+    salt = hashlib.sha256(f"staff:{username}".encode()).hexdigest()[:16]
+    digest = hashlib.scrypt(password.encode(), salt=salt.encode(), n=n, r=r, p=p, maxmem=132 * n * r * p, dklen=64)
+    return f"scrypt:{n}:{r}:{p}${salt}${digest.hex()}"
+
+
 def secs(t: str):
     """'1:04.4' -> 64.4, '33.77' -> 33.77, 'DNS' -> None."""
     if t == "DNS":
@@ -389,6 +397,10 @@ def main():
     o.insert("OFFICIAL", ["Person_ID", "Duty_Title", "Certified_Since", "Supervisor_ID"],
              [((oid, title, since, chief if sup else None), f"{GEN}: official")
               for oid, _f, _l, _d, _g, title, since, sup, _duty in officials])
+    o.comment("Staff Desk logins: username = first name, demo password 'staff2027' (hash only)")
+    o.insert("STAFF_ACCOUNT", ["Person_ID", "Username", "Password_Hash"],
+             [((oid, first.lower(), staff_hash(first.lower())), f"{GEN}: staff login")
+              for oid, first, *_ in officials])
     o.comment("Officials on duty at the 2026 and 2027 races")
     o.insert("OFFICIATES_IN", ["Official_ID", "Edition_Year", "Race_No", "Duty"],
              [((oid, y, r["no"], duty), f"{GEN}")

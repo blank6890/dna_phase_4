@@ -34,3 +34,17 @@ def test_unmatched_rows_exist(db_conn):
                            "(SELECT 1 FROM EXHIBITS_AT x WHERE x.Vendor_ID = v.Vendor_ID)") >= 1
     assert scalar(db_conn, "SELECT COUNT(*) FROM RACE ra WHERE NOT EXISTS (SELECT 1 FROM REGISTRATION r "
                            "WHERE r.Edition_Year = ra.Edition_Year AND r.Race_No = ra.Race_No)") >= 1
+
+
+def test_one_staff_account_per_official(db_conn):
+    assert scalar(db_conn, "SELECT COUNT(*) FROM STAFF_ACCOUNT") == 8
+    assert scalar(db_conn, "SELECT COUNT(*) FROM OFFICIAL o LEFT JOIN STAFF_ACCOUNT s USING (Person_ID) "
+                           "WHERE s.Person_ID IS NULL") == 0
+
+
+def test_staff_passwords_hashed(db_conn):
+    from werkzeug.security import check_password_hash
+    rows = q(db_conn, "SELECT Username, Password_Hash FROM STAFF_ACCOUNT ORDER BY Person_ID")
+    assert [r["Username"] for r in rows] == ["matti", "riitta", "juha", "anne", "pekka", "jari", "sari", "minna"]
+    assert all(check_password_hash(r["Password_Hash"], "staff2027") for r in rows)
+    assert not any("staff2027" in r["Password_Hash"] for r in rows)
