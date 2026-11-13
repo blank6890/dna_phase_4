@@ -13,8 +13,8 @@ class ApiError(Exception):
         self.message = message
 
 
-def respond(rows, *sqls):
-    return jsonify(rows=rows, sql="\n\n".join(sqls))
+def respond(rows, *sqls, **extra):
+    return jsonify(rows=rows, sql="\n\n".join(sqls), **extra)
 
 
 def done(message, *sqls, **extra):
