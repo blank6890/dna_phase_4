@@ -94,19 +94,28 @@ export function YearSelect({ value, onChange, years, label = "Edition" }) {
   );
 }
 
-/** Load {rows, sql} from an endpoint whenever `deps` change. */
+/** Load {rows, sql} from an endpoint whenever `deps` change. Data is tagged with the query it
+    answers, so a render never pairs new columns with rows from the previous query. */
 export function useQuery(path, params, deps) {
-  const [state, setState] = useState({ rows: null, sql: "", error: "", loading: true, extra: {} });
+  const key = JSON.stringify([path, ...deps]);
+  const [state, setState] = useState({ key: null, rows: null, sql: "", error: "", extra: {} });
   const [tick, setTick] = useState(0);
   useEffect(() => {
     if (!path) return;
     let live = true;
-    setState((s) => ({ ...s, loading: true, error: "" }));
     get(path, params)
-      .then((b) => live && setState({ rows: b.rows, sql: b.sql, error: "", loading: false, extra: b }))
-      .catch((e) => live && setState({ rows: null, sql: "", error: e.message, loading: false, extra: {} }));
+      .then((b) => live && setState({ key, rows: b.rows, sql: b.sql, error: "", extra: b }))
+      .catch((e) => live && setState({ key, rows: null, sql: "", error: e.message, extra: {} }));
     return () => { live = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [path, tick, ...deps]);
-  return { ...state, reload: () => setTick((t) => t + 1) };
+  }, [key, tick]);
+  const current = state.key === key;
+  return {
+    rows: current ? state.rows : null,
+    sql: current ? state.sql : "",
+    error: current ? state.error : "",
+    extra: current ? state.extra : {},
+    loading: !current,
+    reload: () => setTick((t) => t + 1),
+  };
 }
