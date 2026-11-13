@@ -33,7 +33,7 @@ def connect():
     return pymysql.connect(
         host=os.environ.get("DB_HOST", "localhost"), user=os.environ["DB_USER"],
         password=os.environ["DB_PASS"], database=TEST_DB, charset="utf8mb4",
-        cursorclass=pymysql.cursors.DictCursor, autocommit=False,
+        cursorclass=pymysql.cursors.DictCursor, autocommit=True,   # always see the app's commits
     )
 
 

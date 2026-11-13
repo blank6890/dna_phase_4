@@ -5,7 +5,7 @@ Run:  python app.py   then open http://localhost:5000
 from flask import Flask
 
 import db
-from api import ApiError, parse_choice, parse_int, parse_str, register_error_handlers, respond
+from api import ApiError, body, done, parse_choice, parse_int, parse_str, register_error_handlers, respond
 from repo import people, protests, registrations, reports, results, vendors
 
 
@@ -21,6 +21,7 @@ def create_app() -> Flask:
 
     register_public_routes(app)
     register_desk_routes(app)
+    register_registration_routes(app)
     return app
 
 
@@ -149,6 +150,43 @@ def register_desk_routes(app: Flask) -> None:
         else:
             raise ApiError(404, "Unknown report")
         return respond(rows, sql)
+
+
+def register_registration_routes(app: Flask) -> None:
+    @app.post("/api/registrations")
+    def api_register():                                  # I1
+        result, sqls = registrations.register(body(), results.SERIES)
+        return done(f"Registered with bib {result['bib_no']}", *sqls, **result)
+
+    @app.get("/api/registrations/<int:reg_id>")
+    def api_registration(reg_id):
+        registration, members, sqls = registrations.details(reg_id)
+        return respond(members, *sqls, registration=registration)
+
+    @app.post("/api/registrations/<int:reg_id>/cancel")
+    def api_cancel(reg_id):                              # U2
+        refund, sqls = registrations.cancel(reg_id)
+        return done(f"Registration cancelled; refund {refund:.2f} EUR", *sqls, refund=refund)
+
+    @app.patch("/api/entries/<int:entry_id>/roles/<role>")
+    def api_replace_member(entry_id, role):              # U4
+        person_id, sqls = registrations.replace_member(entry_id, role, body())
+        return done("Member replaced", *sqls, person_id=person_id)
+
+    @app.delete("/api/registrations/<int:reg_id>")
+    def api_delete_registration(reg_id):                 # D1
+        sqls = registrations.delete(reg_id)
+        return done("Registration deleted", *sqls)
+
+    @app.get("/api/entries/unregistered")
+    def api_unregistered():
+        rows, sql = registrations.unregistered_entries()
+        return respond(rows, sql)
+
+    @app.delete("/api/entries/<int:entry_id>")
+    def api_delete_entry(entry_id):                      # D2
+        sql = registrations.delete_entry(entry_id)
+        return done("Entry deleted", sql)
 
 
 app = create_app()

@@ -131,6 +131,8 @@ def _db_error(err):
             return 409, "Bib number already used in this edition"
         if "uq_person_email" in msg:
             return 409, "A person with this e-mail address already exists"
+        if "uq_participates_person" in msg:
+            return 409, "This person already has a role in this entry"
         if "uq_reg_entry_race" in msg:
             return 409, "This entry is already registered for this race"
         if "PRIMARY" in msg:
