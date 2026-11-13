@@ -1,6 +1,14 @@
 import { useState } from "react";
-import { send } from "../api.js";
 import { Alert, DataTable, SqlPanel, YearSelect, useEditions, useQuery } from "../components/ui.jsx";
+
+/** Booth table columns, shared with the Organiser desk (which adds the remove action). */
+export const BOOTH_COLUMNS = [
+  { key: "Business_Name", label: "Vendor" },
+  { key: "Booth_Size", label: "Booth" },
+  { key: "Booth_Fee_EUR", label: "Fee (€)", num: true, render: (r) => r.Booth_Fee_EUR.toFixed(2) },
+  { key: "Electricity_Required", label: "Electricity", render: (r) => (r.Electricity_Required ? "Yes" : "No") },
+  { key: "Paid", label: "Paid", render: (r) => (r.Paid ? "Paid" : "Unpaid") },
+];
 
 function VendorSearch() {
   const [q, setQ] = useState("");
@@ -35,34 +43,12 @@ function Bookings() {
   const editions = useEditions();
   const [year, setYear] = useState(2027);
   const data = useQuery(`/api/editions/${year}/booths`, {}, [year]);
-  const [message, setMessage] = useState("");
-  const [error, setError] = useState("");
-  const [lastSql, setLastSql] = useState("");
-
-  async function remove(row) {
-    if (!window.confirm(`Remove the unpaid ${row.Booth_Size} booking of ${row.Business_Name} for ${year}?`)) return;
-    setMessage(""); setError("");
-    try {
-      const r = await send("DELETE", `/api/booths/${row.Vendor_ID}/${year}`);
-      setMessage(r.message); setLastSql(r.sql); data.reload();
-    } catch (e) { setError(e.message); }
-  }
-
   return (
     <section className="section">
-      <h2>Booth bookings (organiser view)</h2>
+      <h2>Booth bookings</h2>
       <div className="toolbar"><YearSelect years={editions} value={year} onChange={setYear} /></div>
-      <Alert kind="success">{message}</Alert>
-      <Alert>{error}</Alert>
-      <DataTable rows={data.rows} empty="No booths booked for this edition." columns={[
-        { key: "Business_Name", label: "Vendor" },
-        { key: "Booth_Size", label: "Booth" },
-        { key: "Booth_Fee_EUR", label: "Fee (€)", num: true, render: (r) => r.Booth_Fee_EUR.toFixed(2) },
-        { key: "Electricity_Required", label: "Electricity", render: (r) => (r.Electricity_Required ? "Yes" : "No") },
-        { key: "Paid", label: "Paid", render: (r) => (r.Paid ? "Paid" : "Unpaid") },
-        { key: "act", label: "", render: (r) => !r.Paid ? <button className="btn btn--danger" onClick={() => remove(r)}>Remove booking</button> : null },
-      ]} />
-      <SqlPanel sql={lastSql || data.sql} />
+      <DataTable rows={data.rows} empty="No booths booked for this edition." columns={BOOTH_COLUMNS} />
+      <SqlPanel sql={data.sql} />
     </section>
   );
 }

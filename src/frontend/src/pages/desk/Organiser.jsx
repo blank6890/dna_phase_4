@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { send } from "../../api.js";
 import { Alert, Bib, DataTable, SERIES, SqlPanel, Tabs, YearSelect, useEditions, useQuery } from "../../components/ui.jsx";
+import { BOOTH_COLUMNS } from "../Market.jsx";
 
 function AwardForm({ reg, prizes, onDone }) {
   const [prize, setPrize] = useState("");
@@ -12,6 +13,38 @@ function AwardForm({ reg, prizes, onDone }) {
       </select>
       <button className="btn btn--quiet btn--small" type="submit" disabled={!prize}>Award</button>
     </form>
+  );
+}
+
+function Bookings() {
+  const editions = useEditions();
+  const [year, setYear] = useState(2027);
+  const data = useQuery(`/api/editions/${year}/booths`, {}, [year]);
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+  const [lastSql, setLastSql] = useState("");
+
+  async function remove(row) {
+    if (!window.confirm(`Remove the unpaid ${row.Booth_Size} booking of ${row.Business_Name} for ${year}?`)) return;
+    setMessage(""); setError("");
+    try {
+      const r = await send("DELETE", `/api/booths/${row.Vendor_ID}/${year}`);
+      setMessage(r.message); setLastSql(r.sql); data.reload();
+    } catch (e) { setError(e.message); }
+  }
+
+  return (
+    <section className="section">
+      <h2>Market booth bookings</h2>
+      <div className="toolbar"><YearSelect years={editions} value={year} onChange={setYear} /></div>
+      <Alert kind="success">{message}</Alert>
+      <Alert>{error}</Alert>
+      <DataTable rows={data.rows} empty="No booths booked for this edition." columns={[
+        ...BOOTH_COLUMNS,
+        { key: "act", label: "", render: (r) => !r.Paid ? <button className="btn btn--danger" onClick={() => remove(r)}>Remove booking</button> : null },
+      ]} />
+      <SqlPanel sql={lastSql || data.sql} />
+    </section>
   );
 }
 
@@ -41,7 +74,7 @@ export default function Organiser() {
   return (
     <>
       <h1>Organiser desk</h1>
-      <p className="desk-note">Staff pages for the organising office. This student project has no login: anyone running it locally acts as staff.</p>
+      <p className="desk-note">Staff pages for the organising office. Only logged-in officials can open these pages or run their actions.</p>
       <div className="toolbar"><YearSelect years={editions} value={year} onChange={setYear} /></div>
       <Alert kind="success">{message}</Alert>
       <Alert>{error}</Alert>
@@ -107,6 +140,8 @@ export default function Organiser() {
         ]} />
         <SqlPanel sql={persons.sql} />
       </section>
+
+      <Bookings />
     </>
   );
 }

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { get, send } from "../../api.js";
 import { Alert, Bib, DataTable, SERIES, SqlPanel, Tabs, YearSelect, seriesName, useEditions, useQuery } from "../../components/ui.jsx";
 import { formatGap, formatTime } from "../../components/formatTime.js";
+import { useStaff } from "../../components/staff.jsx";
 
 const STAGES_HEATS = ["Heat 1", "Heat 2", "Heat 3", "Final"];
 
@@ -11,7 +12,7 @@ function nowLocal() {
 }
 
 /** Edit-time and add-penalty controls for one result row. */
-function RowActions({ row, stage, official, act }) {
+function RowActions({ row, stage, act }) {
   const [mode, setMode] = useState(null);
   const [time, setTime] = useState(row.Raw_Time_s ?? "");
   const [status, setStatus] = useState(row.Status);
@@ -30,7 +31,7 @@ function RowActions({ row, stage, official, act }) {
       <form className="inline-form" onSubmit={(e) => {
         e.preventDefault();
         act(() => send("PATCH", `/api/results/${row.Registration_ID}/${encodeURIComponent(stage)}`,
-          { raw_time_s: status === "Finished" ? Number(time) : null, status, official_id: official })).then(() => setMode(null)).catch(() => {});
+          { raw_time_s: status === "Finished" ? Number(time) : null, status })).then(() => setMode(null)).catch(() => {});
       }}>
         <select value={status} onChange={(e) => setStatus(e.target.value)} aria-label="Status">
           <option>Finished</option><option>DNS</option><option>DNF</option><option>DQ</option>
@@ -46,7 +47,7 @@ function RowActions({ row, stage, official, act }) {
     <form className="inline-form" onSubmit={(e) => {
       e.preventDefault();
       act(() => send("POST", "/api/penalties", { registration_id: row.Registration_ID, stage, type: "Penalty",
-        seconds: Number(seconds), reason, official_id: official })).then(() => setMode(null)).catch(() => {});
+        seconds: Number(seconds), reason })).then(() => setMode(null)).catch(() => {});
     }}>
       <input type="number" step="0.5" min="0.5" required value={seconds} size={4} onChange={(e) => setSeconds(e.target.value)} aria-label="Penalty seconds" />
       <input required placeholder="Reason" value={reason} onChange={(e) => setReason(e.target.value)} aria-label="Reason" />
@@ -56,7 +57,7 @@ function RowActions({ row, stage, official, act }) {
   );
 }
 
-function RecordResult({ year, series, stage, results, official, act }) {
+function RecordResult({ year, series, stage, results, act }) {
   const regs = useQuery("/api/registrations", { year, series }, [year, series, results]);
   const done = new Set((results || []).map((r) => r.Registration_ID));
   const open = (regs.rows || []).filter((r) => r.Status === "Registered" && !done.has(r.Registration_ID));
@@ -68,7 +69,7 @@ function RecordResult({ year, series, stage, results, official, act }) {
     <form className="inline-form" onSubmit={(e) => {
       e.preventDefault();
       act(() => send("POST", "/api/results", { registration_id: Number(reg), stage, status,
-        raw_time_s: status === "Finished" ? Number(time) : null, official_id: official })).then(() => { setReg(""); setTime(""); }).catch(() => {});
+        raw_time_s: status === "Finished" ? Number(time) : null })).then(() => { setReg(""); setTime(""); }).catch(() => {});
     }}>
       <label className="field"><span>Registration</span>
         <select required value={reg} onChange={(e) => setReg(e.target.value)}>
@@ -167,7 +168,7 @@ function FileProtest({ year, series, act }) {
 export default function Jury() {
   const editions = useEditions().filter((e) => e.Series);
   const [officials, setOfficials] = useState([]);
-  const [official, setOfficial] = useState("");
+  const { staff } = useStaff();
   const [year, setYear] = useState(2026);
   const [series, setSeries] = useState("MAIN");
   const [stage, setStage] = useState("Final");
@@ -183,7 +184,6 @@ export default function Jury() {
 
   async function act(fn) {
     setMessage(""); setError("");
-    if (!official) { setError("Choose the acting official first."); throw new Error("no official"); }
     try {
       const r = await fn();
       setMessage(r.message); setLastSql(r.sql);
@@ -196,13 +196,9 @@ export default function Jury() {
   return (
     <>
       <h1>Jury desk</h1>
-      <p className="desk-note">Record and correct results, add time penalties and decide protests. Every change is stored with the acting official.</p>
+      <p className="desk-note">Record and correct results, add time penalties and decide protests. Every change is stored with the official who is logged in.</p>
       <div className="toolbar">
-        <label className="field field--inline"><span>Acting official</span>
-          <select value={official} onChange={(e) => setOfficial(Number(e.target.value) || "")}>
-            <option value="">Choose…</option>
-            {officials.map((o) => <option key={o.Person_ID} value={o.Person_ID}>{o.First_Name} {o.Last_Name}, {o.Duty_Title}</option>)}
-          </select></label>
+        <p className="field field--inline"><span>Recording as</span><strong>{staff.First_Name} {staff.Last_Name}</strong></p>
         <YearSelect years={editions} value={year} onChange={setYear} />
       </div>
       <Alert kind="success">{message}</Alert>
@@ -221,11 +217,11 @@ export default function Jury() {
           { key: "Raw_Time_s", label: "Raw", num: true, render: (r) => formatTime(r.Raw_Time_s) },
           { key: "Net_Time_s", label: "Net", num: true, render: (r) => r.Status === "Finished" ? formatTime(r.Net_Time_s) : r.Status },
           { key: "Gap_To_Leader_s", label: "Diff", num: true, render: (r) => formatGap(r.Gap_To_Leader_s, series === "SPR" ? 2 : 1) },
-          { key: "act", label: "", render: (r) => <RowActions row={r} stage={effectiveStage} official={official} act={act} /> },
+          { key: "act", label: "", render: (r) => <RowActions row={r} stage={effectiveStage} act={act} /> },
         ]} />
         <SqlPanel sql={results.sql} />
         <h3 style={{ marginTop: "1.5rem" }}>Record a result</h3>
-        <RecordResult year={year} series={series} stage={effectiveStage} results={results.rows} official={official} act={act} />
+        <RecordResult year={year} series={series} stage={effectiveStage} results={results.rows} act={act} />
       </section>
 
       <section className="section">
