@@ -6,7 +6,7 @@ from flask import Flask
 
 import db
 from api import ApiError, parse_choice, parse_int, parse_str, register_error_handlers, respond
-from repo import people, results, vendors
+from repo import people, protests, registrations, reports, results, vendors
 
 
 def create_app() -> Flask:
@@ -20,6 +20,7 @@ def create_app() -> Flask:
         return respond(db.query(sql), sql)
 
     register_public_routes(app)
+    register_desk_routes(app)
     return app
 
 
@@ -98,6 +99,55 @@ def register_public_routes(app: Flask) -> None:
     @app.get("/api/editions/<int:year>/booths")
     def api_booths(year):                                # P3
         rows, sql = vendors.booths(year)
+        return respond(rows, sql)
+
+
+def register_desk_routes(app: Flask) -> None:
+    @app.get("/api/registrations")
+    def api_registrations():                             # S1
+        year = parse_int("year")
+        series = parse_choice("series", results.SERIES)
+        rows, sql = registrations.list_for_race(year, series)
+        return respond(rows, sql)
+
+    @app.get("/api/protests")
+    def api_protests():                                  # S2 with status=Pending
+        status = parse_choice("status", protests.OUTCOMES, required=False)
+        rows, sql = protests.list_protests(status)
+        return respond(rows, sql)
+
+    @app.get("/api/editions/<int:year>/persons")
+    def api_edition_persons(year):                       # P1
+        rows, sql = registrations.persons_in_edition(year)
+        return respond(rows, sql)
+
+    @app.get("/api/editions/<int:year>/heaviest-carried")
+    def api_heaviest(year):                              # A5
+        rows, sql = registrations.heaviest_carried(year)
+        return respond(rows, sql)
+
+    simple_reports = {
+        "avg-times": reports.avg_times,                  # A2
+        "fees": reports.fees,                            # A3
+        "medals": reports.medals,                        # AR1
+        "backpacks": reports.backpacks,                  # AR2
+        "income": reports.income,                        # AR4
+        "protests": reports.protest_outcomes,            # AR5
+    }
+    year_reports = {
+        "registrations-by-country": reports.registrations_by_country,   # A4
+        "multi-series": reports.multi_series,                           # AR3
+        "above-average": reports.above_average,                         # AR6
+    }
+
+    @app.get("/api/reports/<name>")
+    def api_report(name):
+        if name in simple_reports:
+            rows, sql = simple_reports[name]()
+        elif name in year_reports:
+            rows, sql = year_reports[name](parse_int("year"))
+        else:
+            raise ApiError(404, "Unknown report")
         return respond(rows, sql)
 
 
