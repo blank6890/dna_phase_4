@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
+import { useStaff } from "./staff.jsx";
 
 const MENU = [
   { label: "The Event", items: [["Programme 2027", "/programme"], ["Market Place", "/market"]] },
@@ -14,11 +15,9 @@ const MENU = [
       ["Manage my registration", "/my-registration"],
     ],
   },
-  {
-    label: "Staff Desk",
-    items: [["Organiser", "/desk/organiser"], ["Jury", "/desk/jury"], ["Committee reports", "/desk/reports"]],
-  },
 ];
+
+const DESK = [["Organiser", "/desk/organiser"], ["Jury", "/desk/jury"], ["Committee reports", "/desk/reports"]];
 
 const PARTNERS = [
   ["Olvi", "http://www.olvi.fi/"],
@@ -42,6 +41,31 @@ function SearchBox({ onDone }) {
              onChange={(e) => setQ(e.target.value)} minLength={2} />
       <button type="submit">Search</button>
     </form>
+  );
+}
+
+/** Staff Desk menu group: a login link when logged out; the desk pages and log out when logged in. */
+function StaffMenu() {
+  const { staff, logout } = useStaff();
+  const navigate = useNavigate();
+  return (
+    <div className="nav__group">
+      <span className="nav__label">Staff Desk</span>
+      <ul>
+        {staff ? (
+          <>
+            {DESK.map(([text, to]) => <li key={to}><NavLink to={to} end>{text}</NavLink></li>)}
+            <li>
+              <a href="/" onClick={(e) => { e.preventDefault(); logout().finally(() => navigate("/")); }}>
+                Log out ({staff.First_Name} {staff.Last_Name})
+              </a>
+            </li>
+          </>
+        ) : (
+          <li><NavLink to="/desk/login" end>Staff login</NavLink></li>
+        )}
+      </ul>
+    </div>
   );
 }
 
@@ -74,6 +98,7 @@ export default function Layout({ children }) {
                 </ul>
               </div>
             ))}
+            <StaffMenu />
             <NavLink to="/register" className="nav__cta">Register for 2027</NavLink>
             <SearchBox onDone={() => setOpen(false)} />
           </nav>

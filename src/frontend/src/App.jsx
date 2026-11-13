@@ -1,7 +1,9 @@
 import { Link, Route, Routes } from "react-router-dom";
 import Layout from "./components/Layout.jsx";
 import Champions from "./pages/Champions.jsx";
+import { RequireStaff } from "./components/staff.jsx";
 import Jury from "./pages/desk/Jury.jsx";
+import Login from "./pages/desk/Login.jsx";
 import Organiser from "./pages/desk/Organiser.jsx";
 import Reports from "./pages/desk/Reports.jsx";
 import Competitors from "./pages/Competitors.jsx";
@@ -39,9 +41,10 @@ export default function App() {
         <Route path="/grand-prix" element={<GrandPrix />} />
         <Route path="/market" element={<Market />} />
         <Route path="/programme" element={<Programme />} />
-        <Route path="/desk/organiser" element={<Organiser />} />
-        <Route path="/desk/jury" element={<Jury />} />
-        <Route path="/desk/reports" element={<Reports />} />
+        <Route path="/desk/login" element={<Login />} />
+        <Route path="/desk/organiser" element={<RequireStaff><Organiser /></RequireStaff>} />
+        <Route path="/desk/jury" element={<RequireStaff><Jury /></RequireStaff>} />
+        <Route path="/desk/reports" element={<RequireStaff><Reports /></RequireStaff>} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </Layout>
