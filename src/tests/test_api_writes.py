@@ -138,3 +138,34 @@ def test_d2_unregistered_entry(wclient, fresh_db):
     busy = scalar(fresh_db, "SELECT Entry_ID FROM REGISTRATION WHERE Edition_Year=2026 AND Bib_No=62")
     r = wclient.delete(f"/api/entries/{busy}")
     assert r.status_code == 409 and "other records still refer" in r.get_json()["error"]
+
+
+# ---------------------------------------------------------------- Task 10: D3 remove unpaid booth booking
+def test_d3_remove_only_booking_deletes_vendor(wclient, fresh_db):
+    r = wclient.delete("/api/booths/8/2027")            # Retkeilijän Grilli: unpaid, only booking
+    assert r.status_code == 200, r.get_json()
+    assert r.get_json()["vendor_deleted"] is True
+    assert scalar(fresh_db, "SELECT COUNT(*) FROM VENDOR WHERE Vendor_ID=8") == 0
+
+
+def test_d3_vendor_with_other_bookings_kept(wclient, fresh_db):
+    r = wclient.delete("/api/booths/2/2027")            # Savon Käsityöpaja also booked 2026
+    assert r.status_code == 200 and r.get_json()["vendor_deleted"] is False
+    assert scalar(fresh_db, "SELECT COUNT(*) FROM VENDOR WHERE Vendor_ID=2") == 1
+    assert scalar(fresh_db, "SELECT COUNT(*) FROM EXHIBITS_AT WHERE Vendor_ID=2 AND Edition_Year=2027") == 0
+
+
+def test_d3_paid_booking_refused(wclient):
+    r = wclient.delete("/api/booths/1/2026")
+    assert r.status_code == 409 and r.get_json()["error"] == "Booking is already paid"
+
+
+def test_d3_started_edition_refused(wclient, fresh_db):
+    with fresh_db.cursor() as cur:
+        cur.execute("UPDATE EXHIBITS_AT SET Paid = FALSE WHERE Vendor_ID = 3 AND Edition_Year = 2026")
+    r = wclient.delete("/api/booths/3/2026")
+    assert r.status_code == 409 and r.get_json()["error"] == "Edition has already started"
+
+
+def test_d3_missing_booking_404(wclient):
+    assert wclient.delete("/api/booths/9/2027").status_code == 404

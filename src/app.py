@@ -223,6 +223,12 @@ def register_jury_routes(app: Flask) -> None:
         rows, sql = prizes.for_series(parse_choice("series", results.SERIES))
         return respond(rows, sql)
 
+    @app.delete("/api/booths/<int:vendor_id>/<int:year>")
+    def api_remove_booth(vendor_id, year):               # D3
+        vendor_deleted, sqls = vendors.remove_booking(vendor_id, year)
+        message = "Booking removed" + (" and vendor deleted (no other bookings)" if vendor_deleted else "")
+        return done(message, *sqls, vendor_deleted=vendor_deleted)
+
     @app.post("/api/awards")
     def api_award():                                     # I4
         return done("Prize awarded", prizes.award(body()))
