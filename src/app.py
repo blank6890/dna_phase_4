@@ -6,7 +6,7 @@ from flask import Flask
 
 import db
 from api import ApiError, body, done, parse_choice, parse_int, parse_str, register_error_handlers, respond
-from repo import people, protests, registrations, reports, results, vendors
+from repo import people, prizes, protests, registrations, reports, results, vendors
 
 
 def create_app() -> Flask:
@@ -22,6 +22,7 @@ def create_app() -> Flask:
     register_public_routes(app)
     register_desk_routes(app)
     register_registration_routes(app)
+    register_jury_routes(app)
     return app
 
 
@@ -187,6 +188,44 @@ def register_registration_routes(app: Flask) -> None:
     def api_delete_entry(entry_id):                      # D2
         sql = registrations.delete_entry(entry_id)
         return done("Entry deleted", sql)
+
+
+def register_jury_routes(app: Flask) -> None:
+    @app.get("/api/officials")
+    def api_officials():
+        rows, sql = results.officials()
+        return respond(rows, sql)
+
+    @app.post("/api/results")
+    def api_record_result():                             # I2
+        return done("Result recorded", *results.record_result(body()))
+
+    @app.patch("/api/results/<int:reg_id>/<stage>")
+    def api_correct_result(reg_id, stage):               # U1
+        return done("Result corrected; ranks and placement prizes updated",
+                    *results.correct_result(reg_id, stage, body()))
+
+    @app.post("/api/penalties")
+    def api_add_penalty():                               # U1
+        return done("Penalty added; ranks and placement prizes updated", *results.add_penalty(body()))
+
+    @app.post("/api/protests")
+    def api_file_protest():                              # I3
+        protest_id, sql = protests.file_protest(body())
+        return done(f"Protest {protest_id} filed", sql, protest_id=protest_id)
+
+    @app.post("/api/protests/<int:protest_id>/decide")
+    def api_decide_protest(protest_id):                  # U3
+        return done("Protest decided", *protests.decide(protest_id, body()))
+
+    @app.get("/api/prizes")
+    def api_prizes():
+        rows, sql = prizes.for_series(parse_choice("series", results.SERIES))
+        return respond(rows, sql)
+
+    @app.post("/api/awards")
+    def api_award():                                     # I4
+        return done("Prize awarded", prizes.award(body()))
 
 
 app = create_app()
