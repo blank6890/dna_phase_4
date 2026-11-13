@@ -2,17 +2,23 @@
 
 Run:  python app.py   then open http://localhost:5000
 """
-from flask import Flask
+from pathlib import Path
+
+from flask import Flask, send_from_directory
 
 import db
 from api import ApiError, body, done, parse_choice, parse_int, parse_str, register_error_handlers, respond
 from repo import people, prizes, protests, registrations, reports, results, vendors
 
 
-def create_app() -> Flask:
-    app = Flask(__name__)
+DEFAULT_DIST = Path(__file__).resolve().parent / "frontend" / "dist"
+
+
+def create_app(frontend_dist: Path | None = None) -> Flask:
+    app = Flask(__name__, static_folder=None)
     app.json.sort_keys = False
     register_error_handlers(app)
+    register_frontend(app, Path(frontend_dist or DEFAULT_DIST))
 
     @app.get("/api/health")
     def health():
@@ -232,6 +238,20 @@ def register_jury_routes(app: Flask) -> None:
     @app.post("/api/awards")
     def api_award():                                     # I4
         return done("Prize awarded", prizes.award(body()))
+
+
+def register_frontend(app: Flask, dist: Path) -> None:
+    """Serve the built React app; unknown non-API paths fall back to index.html (client routing)."""
+    @app.get("/")
+    @app.get("/<path:path>")
+    def frontend(path=""):
+        if path.startswith("api/"):
+            raise ApiError(404, "Not found")
+        if not (dist / "index.html").exists():
+            return ("Frontend not built yet: run `npm install && npm run build` in src/frontend.", 503)
+        if path and (dist / path).is_file():
+            return send_from_directory(dist, path)
+        return send_from_directory(dist, "index.html")
 
 
 app = create_app()
