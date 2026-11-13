@@ -45,15 +45,20 @@ SELECT p.Person_ID, p.First_Name, p.Last_Name,
          WHERE pa.Person_ID = p.Person_ID) AS Registrations
 FROM PERSON p
 LEFT JOIN PERSON_CITIZENSHIP c ON c.Person_ID = p.Person_ID
-WHERE p.First_Name LIKE %s OR p.Last_Name LIKE %s
-   OR CONCAT_WS(' ', p.First_Name, p.Last_Name) LIKE %s
+WHERE REPLACE(p.First_Name, '’', '''') LIKE %s OR REPLACE(p.Last_Name, '’', '''') LIKE %s
+   OR REPLACE(CONCAT_WS(' ', p.First_Name, p.Last_Name), '’', '''') LIKE %s
 GROUP BY p.Person_ID, p.First_Name, p.Last_Name
 ORDER BY p.Last_Name, p.First_Name
 LIMIT 100"""
 
 
+def _fold(q):
+    """Typographic apostrophes match the ASCII one people type."""
+    return q.replace("’", "'")
+
+
 def search_persons(q):
-    pattern = db.like(q)
+    pattern = db.like(_fold(q))
     return db.query(SEARCH_PERSONS_SQL, (pattern, pattern, pattern)), SEARCH_PERSONS_SQL
 
 
@@ -64,13 +69,13 @@ FROM ENTRY e
 JOIN v_entry_name n      ON n.Entry_ID = e.Entry_ID
 LEFT JOIN REGISTRATION r ON r.Entry_ID = e.Entry_ID
 WHERE e.Entry_Type = 'Team'
-  AND (e.Team_Name LIKE %s OR e.Represented_Organisation LIKE %s)
+  AND (REPLACE(e.Team_Name, '’', '''') LIKE %s OR REPLACE(e.Represented_Organisation, '’', '''') LIKE %s)
 GROUP BY e.Entry_ID, e.Team_Name, e.Represented_Organisation, n.Display_Name, n.Countries
 ORDER BY e.Team_Name, Years"""
 
 
 def search_teams(q):
-    pattern = db.like(q)
+    pattern = db.like(_fold(q))
     return db.query(SEARCH_TEAMS_SQL, (pattern, pattern)), SEARCH_TEAMS_SQL
 
 

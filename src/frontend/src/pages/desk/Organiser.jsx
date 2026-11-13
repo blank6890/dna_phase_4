@@ -50,7 +50,7 @@ export default function Organiser() {
       <section className="section">
         <h2>Registrations for {year}</h2>
         <Tabs label="Series" value={series} onChange={setSeries} items={SERIES.map((s) => ({ value: s.code, label: s.name }))} />
-        <DataTable rows={regs.rows} empty="No registrations for this race." rowClass={(r) => (r.Status === "Cancelled" ? "is-out" : undefined)} columns={[
+        <DataTable rows={regs.rows} rowKey={(r) => r.Registration_ID} empty="No registrations for this race." rowClass={(r) => (r.Status === "Cancelled" ? "is-out" : undefined)} columns={[
           { key: "Registration_ID", label: "No.", num: true },
           { key: "Bib_No", label: "Bib", render: (r) => <Bib n={r.Bib_No} /> },
           { key: "Display_Name", label: "Entry", render: (r) => <>{r.Team_Name && <strong>{r.Team_Name}<br /></strong>}{r.Display_Name}<span className="sub">{r.Countries}</span></> },

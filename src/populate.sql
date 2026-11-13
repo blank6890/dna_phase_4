@@ -1223,7 +1223,8 @@ INSERT INTO ENTRY (Entry_ID, Entry_Type, Team_Name, Represented_Organisation, GP
   (119, 'Pair', NULL, NULL, NULL),
   (120, 'Pair', NULL, NULL, NULL),
   (121, 'Pair', NULL, NULL, NULL),
-  (122, 'Pair', NULL, NULL, NULL);
+  (122, 'Pair', NULL, NULL, NULL),
+  (123, 'Pair', NULL, NULL, NULL);
 INSERT INTO PARTICIPATES_AS (Entry_ID, Role_Code, Person_ID, Measured_Weight_kg) VALUES
   (1, 'CARRIER_1', 1, NULL),
   (1, 'CARRIED', 2, 46.0),  -- GENERATED: weight
@@ -1516,8 +1517,10 @@ INSERT INTO PARTICIPATES_AS (Entry_ID, Role_Code, Person_ID, Measured_Weight_kg)
   (120, 'CARRIED', 231, 57.1),  -- GENERATED: weight
   (121, 'CARRIER_1', 232, NULL),
   (121, 'CARRIED', 233, 57.2),  -- GENERATED: weight
-  (122, 'CARRIER_1', 234, NULL),
-  (122, 'CARRIED', 235, 52.2);  -- GENERATED: weight
+  (122, 'CARRIER_1', 21, NULL),
+  (122, 'CARRIED', 22, 48.0),  -- GENERATED: weight
+  (123, 'CARRIER_1', 234, NULL),
+  (123, 'CARRIED', 235, 52.2);  -- GENERATED: weight
 INSERT INTO REPRESENTS (Entry_ID, ISO_Code) VALUES
   (1, 'FIN'),
   (2, 'EST'),
@@ -1651,7 +1654,8 @@ INSERT INTO REPRESENTS (Entry_ID, ISO_Code) VALUES
   (119, 'USA'),
   (120, 'SWE'),
   (121, 'USA'),
-  (122, 'GBR');
+  (122, 'USA'),
+  (123, 'GBR');
 
 -- Registrations (one per entry per race); 2026 timestamps generated, bibs from the results
 INSERT INTO REGISTRATION (Registration_ID, Bib_No, Registered_At, Cancelled_At, Payment_Status, Fee_Paid_EUR, Entry_ID, Edition_Year, Race_No) VALUES
@@ -1822,10 +1826,10 @@ INSERT INTO REGISTRATION (Registration_ID, Bib_No, Registered_At, Cancelled_At, 
   (165, 22, '2026-11-08 14:00:00', NULL, 'Paid', 55, 120, 2027, 5),  -- GENERATED: timestamp and bib
   (166, 23, '2026-11-05 11:00:00', NULL, 'Paid', 55, 121, 2027, 5),  -- GENERATED: timestamp and bib
   (167, 70, '2026-11-12 18:00:00', NULL, 'Paid', 55, 119, 2027, 1),  -- GENERATED: timestamp and bib
-  (168, 71, '2026-11-06 12:00:00', NULL, 'Paid', 55, 11, 2027, 1),  -- GENERATED: timestamp and bib
-  (169, 7, '2026-11-01 10:00:00', NULL, 'Paid', 55, 122, 2027, 4),  -- GENERATED: timestamp and bib
+  (168, 71, '2026-11-06 12:00:00', NULL, 'Paid', 55, 122, 2027, 1),  -- GENERATED: timestamp and bib
+  (169, 7, '2026-11-01 10:00:00', NULL, 'Paid', 55, 123, 2027, 4),  -- GENERATED: timestamp and bib
   (170, 8, '2026-11-04 16:00:00', NULL, 'Paid', 55, 120, 2027, 4),  -- GENERATED: timestamp and bib
-  (171, 9, '2026-11-03 12:00:00', NULL, 'Paid', 55, 11, 2027, 4);  -- GENERATED: timestamp and bib
+  (171, 9, '2026-11-03 12:00:00', NULL, 'Paid', 55, 122, 2027, 4);  -- GENERATED: timestamp and bib
 
 -- Results per stage (times in seconds)
 INSERT INTO RESULT (Registration_ID, Stage, Raw_Time_s, Status, Recorded_By_Official_ID) VALUES

@@ -64,6 +64,8 @@ SELECT pa.Entry_ID
 FROM PARTICIPATES_AS pa
 JOIN ENTRY e ON e.Entry_ID = pa.Entry_ID
 WHERE e.Entry_Type = %s AND (pa.Role_Code, pa.Person_ID) IN ({pairs})
+  AND NOT EXISTS (SELECT 1 FROM REGISTRATION g JOIN RESULT x ON x.Registration_ID = g.Registration_ID
+                  WHERE g.Entry_ID = pa.Entry_ID)      -- an entry that has raced is frozen: start a new one
 GROUP BY pa.Entry_ID
 HAVING COUNT(*) = %s
    AND COUNT(*) = (SELECT COUNT(*) FROM PARTICIPATES_AS x WHERE x.Entry_ID = pa.Entry_ID)
@@ -105,7 +107,7 @@ def _member(data, index):
     if not isinstance(data, dict):
         raise ApiError(400, f"Member {index + 1} must be an object")
     role = as_choice(data.get("role"), f"Member {index + 1} role", ROLES)
-    weight = as_float(data.get("weight_kg"), f"{role} weight", required=(role == "CARRIED"))
+    weight = as_float(data.get("weight_kg"), f"{role} weight", required=(role == "CARRIED"), maximum=300)
     if weight is not None and role != "CARRIED":
         raise ApiError(400, "Only the carried person has a measured weight")
     if data.get("person_id") is not None:
@@ -193,7 +195,8 @@ DETAIL_SQL = """
 SELECT r.Registration_ID, r.Bib_No, r.Registered_At, r.Cancelled_At, r.Payment_Status, r.Fee_Paid_EUR,
        r.Status, r.Refund_EUR, r.Entry_ID, r.Edition_Year, r.Series_Code, r.Race_Start,
        n.Display_Name, n.Team_Name, n.Countries, n.Entry_Type,
-       EXISTS (SELECT 1 FROM RESULT x WHERE x.Registration_ID = r.Registration_ID) AS Has_Results
+       EXISTS (SELECT 1 FROM RESULT x JOIN REGISTRATION g ON g.Registration_ID = x.Registration_ID
+               WHERE g.Entry_ID = r.Entry_ID) AS Has_Results
 FROM v_registration r
 JOIN v_entry_name n ON n.Entry_ID = r.Entry_ID
 WHERE r.Registration_ID = %s"""

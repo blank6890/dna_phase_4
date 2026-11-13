@@ -123,3 +123,8 @@ def test_search_too_short_400(client):
 
 def test_person_404(client):
     assert client.get("/api/people/999999").status_code == 404
+
+
+def test_q1_ascii_apostrophe_finds_typographic(client):
+    names = [f'{r["First_Name"]} {r["Last_Name"]}' for r in rows(client, "/api/search/persons?q=O'Call")]
+    assert "Donncha O’Callaghan" in names

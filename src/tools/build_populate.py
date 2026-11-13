@@ -96,7 +96,7 @@ class World:
         return p
 
     # entries ---------------------------------------------------------------
-    def entry(self, members, isos, team_name=None, org=None, generated=False):
+    def entry(self, members, isos, team_name=None, org=None, generated=False, era=None):
         """members: [(role, name)]; isos: list of ISO codes."""
         pids = []
         for role, name in members:
@@ -107,7 +107,7 @@ class World:
             else:
                 iso = isos[0]
             pids.append((role, self.person(name, iso)["id"]))
-        key = ("Team" if team_name else "Pair", team_name, tuple(sorted(pids)))
+        key = ("Team" if team_name else "Pair", team_name, tuple(sorted(pids)), era)
         e = self.entries.get(key)
         if e is None:
             e = self.entries[key] = {"id": len(self.entries) + 1, "type": key[0], "team": team_name,
@@ -115,8 +115,8 @@ class World:
                                      "recent": False, "generated": generated}
         return e
 
-    def pair(self, carrier, carried, isos, generated=False):
-        return self.entry([("CARRIER_1", carrier), ("CARRIED", carried)], isos, generated=generated)
+    def pair(self, carrier, carried, isos, generated=False, era=None):
+        return self.entry([("CARRIER_1", carrier), ("CARRIED", carried)], isos, generated=generated, era=era)
 
     def team(self, team_name, org, carriers, carried, isos):
         members = [("CARRIER_1", carriers[0]), ("CARRIED", carried),
@@ -262,6 +262,9 @@ def build():
         bib = reg_2027.BIB_START_2027[series]
         for carrier, carried, iso in rows(block):
             e = w.pair(carrier, carried, iso.split("/"))
+            if any(r["entry"] is e and r["year"] < 2027 for r in w.regs):
+                # an entry that has raced is frozen (trigger); a returning pair gets a new entry
+                e = w.pair(carrier, carried, iso.split("/"), era=2027)
             w.register(e, 2027, series, bib, reg_time(2027, h(carrier + series)),
                        note=f"{GEN}: timestamp and bib")
             for n in (carrier, carried):

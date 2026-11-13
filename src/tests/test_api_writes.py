@@ -32,16 +32,69 @@ def test_i1_register_new_pair_2027(wclient, fresh_db):
     assert float(row["Fee_Paid_EUR"]) == 55.0 and row["Bib_No"] == body["bib_no"]
 
 
-def test_i1_existing_people_reuse_entry(wclient, fresh_db):
-    # Andrew Lee / Devon Lee already have a pair entry (2026); registering them for 2027 MAIN reuses it
-    lee = scalar(fresh_db, "SELECT Person_ID FROM PERSON WHERE First_Name='Andrew' AND Last_Name='Lee'")
-    devon = scalar(fresh_db, "SELECT Person_ID FROM PERSON WHERE First_Name='Devon' AND Last_Name='Lee'")
+def _pids(conn, *names):
+    return [scalar(conn, "SELECT Person_ID FROM PERSON WHERE CONCAT(First_Name,' ',Last_Name)=%s", (n,)) for n in names]
+
+
+def test_i1_reuses_entry_without_results(wclient, fresh_db):
+    # Shane Williams / Lauren Williams have a 2027 entry with no results: a third series reuses it
+    shane, lauren = _pids(fresh_db, "Shane Williams", "Lauren Williams")
     entries_before = scalar(fresh_db, "SELECT COUNT(*) FROM ENTRY")
-    r = register(wclient, {"year": 2027, "series": "MAIN", "entry_type": "Pair", "countries": ["USA"],
-                           "members": [{"role": "CARRIER_1", "person_id": lee},
-                                       {"role": "CARRIED", "person_id": devon, "weight_kg": 48}]})
+    r = register(wclient, {"year": 2027, "series": "WOMEN", "entry_type": "Pair", "countries": ["USA"],
+                           "members": [{"role": "CARRIER_1", "person_id": shane},
+                                       {"role": "CARRIED", "person_id": lauren, "weight_kg": 58}]})
     assert r.status_code == 200, r.get_json()
     assert scalar(fresh_db, "SELECT COUNT(*) FROM ENTRY") == entries_before
+
+
+def test_i1_raced_entry_gets_fresh_entry_with_new_weight(wclient, fresh_db):
+    # Taisto Miettinen / Katja Kovanen's entry has results (frozen); a new registration gets a new entry
+    taisto, katja = _pids(fresh_db, "Taisto Miettinen", "Katja Kovanen")
+    r = register(wclient, {"year": 2027, "series": "MAIN", "entry_type": "Pair", "countries": ["FIN"],
+                           "members": [{"role": "CARRIER_1", "person_id": taisto},
+                                       {"role": "CARRIED", "person_id": katja, "weight_kg": 61.5}]})
+    assert r.status_code == 200, r.get_json()
+    entry = r.get_json()["entry_id"]
+    assert scalar(fresh_db, "SELECT COUNT(*) FROM RESULT x JOIN REGISTRATION g USING (Registration_ID) "
+                            "WHERE g.Entry_ID=%s", (entry,)) == 0
+    assert float(scalar(fresh_db, "SELECT Measured_Weight_kg FROM PARTICIPATES_AS WHERE Entry_ID=%s "
+                                  "AND Role_Code='CARRIED'", (entry,))) == 61.5
+
+
+def test_seeded_returning_pair_can_replace_member(wclient, fresh_db):
+    # 2027 registrations of Andrew/Devon Lee (who raced in 2026) must not be locked by 2026 results
+    rid = scalar(fresh_db, "SELECT Registration_ID FROM REGISTRATION WHERE Edition_Year=2027 AND Bib_No=9")
+    details = wclient.get(f"/api/registrations/{rid}").get_json()
+    assert details["registration"]["Has_Results"] == 0
+    entry = details["registration"]["Entry_ID"]
+    r = wclient.patch(f"/api/entries/{entry}/roles/CARRIED",
+                      json={"new": new_person("Uusi", "Kannettava", "1990-01-01"), "weight_kg": 55})
+    assert r.status_code == 200, r.get_json()
+
+
+def test_has_results_is_entry_level(wclient, fresh_db):
+    # a registration whose entry raced elsewhere must report Has_Results so the UI hides Replace
+    taisto, katja = _pids(fresh_db, "Taisto Miettinen", "Katja Kovanen")
+    entry = scalar(fresh_db, "SELECT Entry_ID FROM REGISTRATION WHERE Edition_Year=2026 AND Bib_No=62")
+    with fresh_db.cursor() as cur:
+        cur.execute("INSERT INTO REGISTRATION (Bib_No, Registered_At, Payment_Status, Fee_Paid_EUR, Entry_ID, "
+                    "Edition_Year, Race_No) VALUES (99, NOW(), 'Paid', 55, %s, 2027, 5)", (entry,))
+        rid = cur.lastrowid
+    assert wclient.get(f"/api/registrations/{rid}").get_json()["registration"]["Has_Results"] == 1
+
+
+def test_out_of_range_numbers_400(wclient):
+    payload = pair_payload()
+    payload["members"][1]["weight_kg"] = 123456
+    r = register(wclient, payload)
+    assert r.status_code == 400 and "weight" in r.get_json()["error"]
+    payload["members"][1]["weight_kg"] = "inf"
+    assert register(wclient, payload).status_code == 400
+    r = wclient.post("/api/results", json={"registration_id": 1, "stage": "Single", "status": "Finished",
+                                           "raw_time_s": 1000000, "official_id": 1})
+    assert r.status_code == 400
+    r = wclient.post("/api/awards", json={"prize_id": 99999999999, "registration_id": 1})
+    assert r.status_code == 400
 
 
 def test_i1_rollback_on_underage(wclient, fresh_db):

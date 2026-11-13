@@ -100,22 +100,23 @@ The committed `populate.sql` is the deliverable.
    sudo mariadb -e 'CREATE USER IF NOT EXISTS "phase4"@"localhost" IDENTIFIED BY "phase4";
                     GRANT ALL PRIVILEGES ON `eukonkanto\_%`.* TO "phase4"@"localhost"; FLUSH PRIVILEGES;'
    ```
-2. **Create and fill the database.** The schema script drops and recreates `eukonkanto_db`:
+2. **Create and fill the database** (from the repository root; the schema script drops and
+   recreates `eukonkanto_db`):
    ```bash
-   cd src
-   mysql -u phase4 -p < schema.sql        # password: phase4
-   mysql -u phase4 -p < populate.sql
+   mysql -u phase4 -p < src/schema.sql        # password: phase4
+   mysql -u phase4 -p < src/populate.sql
    ```
-3. **Install the Python dependencies:**
+3. **Install the Python dependencies** (from the repository root; versions above are the ones tested):
    ```bash
    python -m venv .venv && source .venv/bin/activate
    pip install -r src/requirements.txt
    ```
-4. **Build the frontend** (Node 18 or newer):
+4. **Build the frontend** (Node 18 or newer), then return to the root:
    ```bash
-   cd src/frontend && npm install && npm run build
+   cd src/frontend && npm install && npm run build && cd ../..
    ```
-5. **Start the app:** `cd src && python app.py`, then open **<http://localhost:5000>**.
+5. **Start the app** with the virtual environment active: `cd src && python app.py`, then open
+   **<http://localhost:5000>**.
 
 Credentials come from the environment variables `DB_HOST`, `DB_USER`, `DB_PASS` and `DB_NAME`
 (defaults: `localhost`, `phase4`, `phase4`, `eukonkanto_db`; see `src/config.py`).

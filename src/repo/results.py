@@ -136,7 +136,7 @@ def _penalty(p):
     if not isinstance(p, dict):
         raise ApiError(400, "Each penalty must be an object")
     kind = as_choice(p.get("type"), "penalty type", ADJUSTMENTS)
-    seconds = as_float(p.get("seconds"), "penalty seconds", required=(kind != "Warning")) or 0
+    seconds = as_float(p.get("seconds"), "penalty seconds", required=(kind != "Warning"), maximum=600) or 0
     return kind, seconds, as_str(p.get("reason"), "penalty reason", max_len=200)
 
 
@@ -153,7 +153,7 @@ def record_result(payload):
     reg = as_int(payload.get("registration_id"), "registration_id", minimum=1)
     stage = as_choice(payload.get("stage"), "stage", STAGES)
     status = as_choice(payload.get("status"), "status", STATUSES)
-    raw = _time_for(status, as_float(payload.get("raw_time_s"), "raw_time_s", required=False))
+    raw = _time_for(status, as_float(payload.get("raw_time_s"), "raw_time_s", required=False, maximum=3600))
     official = as_int(payload.get("official_id"), "official_id", minimum=1)
     penalties = [_penalty(p) for p in (payload.get("penalties") or [])]
     with db.transaction() as cur:
@@ -175,7 +175,7 @@ def correct_result(reg, stage, payload):
         if current is None:
             raise ApiError(404, "Result not found")
         status = as_choice(payload.get("status"), "status", STATUSES, required=False) or current["Status"]
-        raw = as_float(payload.get("raw_time_s"), "raw_time_s", required=False)
+        raw = as_float(payload.get("raw_time_s"), "raw_time_s", required=False, maximum=3600)
         if raw is None and status == "Finished" and "raw_time_s" not in payload:
             raw = current["Raw_Time_s"]
         raw = _time_for(status, raw)

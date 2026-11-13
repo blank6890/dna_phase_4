@@ -147,7 +147,7 @@ function FileProtest({ year, series, act }) {
       e.preventDefault();
       const reg = (regs.rows || []).find((r) => r.Entry_ID === Number(entry));
       act(() => send("POST", "/api/protests", { entry_id: Number(entry), year, race_no: reg.Race_No, reason,
-        filed_at: filedAt.replace("T", " ") + ":00" })).then(() => setReason(""));
+        filed_at: filedAt.replace("T", " ") + ":00" })).then(() => setReason("")).catch(() => {});
     }}>
       <label className="field"><span>Protesting entry</span>
         <select required value={entry} onChange={(e) => setEntry(e.target.value)}>
@@ -213,7 +213,8 @@ export default function Jury() {
         <h2>Race results</h2>
         <Tabs label="Series" value={series} onChange={setSeries} items={SERIES.map((s) => ({ value: s.code, label: s.name }))} />
         {series === "SPR" && <Tabs label="Stage" value={stage} onChange={setStage} items={STAGES_HEATS.map((s) => ({ value: s, label: s }))} />}
-        <DataTable rows={results.rows} empty="No results recorded for this race yet." rowClass={(r) => (r.Rank_In_Stage === 1 ? "is-first" : undefined)} columns={[
+        <DataTable rows={results.rows} rowKey={(r) => `${r.Registration_ID}|${r.Stage}`}
+                   empty="No results recorded for this race yet." rowClass={(r) => (r.Rank_In_Stage === 1 ? "is-first" : undefined)} columns={[
           { key: "Rank_In_Stage", label: "Rank", render: (r) => r.Rank_In_Stage ? <span className="rank">{r.Rank_In_Stage}.</span> : r.Status },
           { key: "Bib_No", label: "Bib", render: (r) => <Bib n={r.Bib_No} /> },
           { key: "Display_Name", label: "Entry", render: (r) => <>{r.Team_Name && <strong>{r.Team_Name}<br /></strong>}{r.Display_Name}{r.Adjustments && <span className="penalty">{r.Adjustments}</span>}</> },
@@ -243,7 +244,7 @@ export default function Jury() {
       <section className="section">
         <h2>File a protest</h2>
         <p>Written protests reach the jury within 15 minutes of the last finisher; the fee is 150 €. Uses the race chosen above.</p>
-        <FileProtest year={year} series={series} act={safeAct} />
+        <FileProtest year={year} series={series} act={act} />
       </section>
     </>
   );

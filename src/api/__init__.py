@@ -1,5 +1,6 @@
 """Request parsing, JSON responses and database-error mapping shared by every route."""
 import datetime as dt
+import math
 import re
 
 import pymysql
@@ -22,7 +23,10 @@ def done(message, *sqls, **extra):
 
 
 # ---------------------------------------------------------------- value validators
-def as_int(value, name, required=True, minimum=None):
+INT_MAX = 2_147_483_647
+
+
+def as_int(value, name, required=True, minimum=None, maximum=INT_MAX):
     if value is None or value == "":
         if required:
             raise ApiError(400, f"{name} is required")
@@ -31,12 +35,16 @@ def as_int(value, name, required=True, minimum=None):
         number = int(value)
     except (TypeError, ValueError):
         raise ApiError(400, f"{name} must be a whole number") from None
-    if isinstance(value, bool) or (minimum is not None and number < minimum):
-        raise ApiError(400, f"{name} must be a whole number of at least {minimum}")
+    if isinstance(value, bool) or (isinstance(value, float) and not value.is_integer()):
+        raise ApiError(400, f"{name} must be a whole number")
+    if minimum is not None and number < minimum:
+        raise ApiError(400, f"{name} must be at least {minimum}")
+    if number > maximum:
+        raise ApiError(400, f"{name} must be at most {maximum}")
     return number
 
 
-def as_float(value, name, required=True):
+def as_float(value, name, required=True, maximum=99_999):
     if value is None or value == "":
         if required:
             raise ApiError(400, f"{name} is required")
@@ -45,8 +53,10 @@ def as_float(value, name, required=True):
         number = float(value)
     except (TypeError, ValueError):
         raise ApiError(400, f"{name} must be a number") from None
-    if number < 0 or number != number:
+    if isinstance(value, bool) or not math.isfinite(number) or number < 0:
         raise ApiError(400, f"{name} must be a positive number")
+    if number > maximum:
+        raise ApiError(400, f"{name} must be at most {maximum}")
     return number
 
 
@@ -145,6 +155,11 @@ def _db_error(err):
     if code in (3819, 4025):
         m = re.search(r"CONSTRAINT `([^`]+)`", msg)
         return 409, f"Value violates rule: {m.group(1) if m else 'check constraint'}"
+    if code in (1264, 1406):                           # out of range / too long for the column
+        m = re.search(r"column `?'?([A-Za-z_]+)", msg)
+        return 400, f"{m.group(1) if m else 'A value'} is out of range"
+    if code in (1205, 1213):                           # lock wait timeout / deadlock
+        return 409, "The database is busy with another change; please try again"
     if code == 1048:
         m = re.search(r"Column '([^']+)'", msg)
         return 400, f"{m.group(1) if m else 'A value'} is required"

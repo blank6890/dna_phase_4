@@ -36,7 +36,8 @@ export function SqlPanel({ sql }) {
   );
 }
 
-export function DataTable({ columns, rows, empty = "Nothing to show.", rowClass }) {
+/** rowKey: stable id per row, so per-row state (open forms, inputs) follows its row when rows re-sort. */
+export function DataTable({ columns, rows, empty = "Nothing to show.", rowClass, rowKey }) {
   if (!rows) return null;
   if (rows.length === 0) return <p className="empty">{empty}</p>;
   return (
@@ -47,7 +48,7 @@ export function DataTable({ columns, rows, empty = "Nothing to show.", rowClass 
         </thead>
         <tbody>
           {rows.map((r, i) => (
-            <tr key={i} className={rowClass ? rowClass(r) : undefined}>
+            <tr key={rowKey ? rowKey(r) : i} className={rowClass ? rowClass(r) : undefined}>
               {columns.map((c) => (
                 <td key={c.key} className={c.num ? "num" : undefined}>
                   {c.render ? c.render(r) : r[c.key] ?? ""}
