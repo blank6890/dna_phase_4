@@ -29,6 +29,10 @@ def seed(conn):
               "VALUES (2090,1,'2090-07-02 15:00:00',55,'ZZ',9001)")
     run(conn, "INSERT INTO ENTRY (Entry_ID,Entry_Type) VALUES (9001,'Pair'),(9002,'Pair')")
     run(conn, "INSERT IGNORE INTO ROLE VALUES ('CARRIER_1','Carrier (leg 1)',1),('CARRIED','Carried person',NULL)")
+    run(conn, "INSERT INTO PERSON (Person_ID,First_Name,Last_Name) VALUES "
+              "(9001,'Seed','A'),(9002,'Seed','B'),(9003,'Seed','C'),(9004,'Seed','D')")
+    run(conn, "INSERT INTO PARTICIPATES_AS VALUES (9001,'CARRIER_1',9001,NULL),(9001,'CARRIED',9002,55),"
+              "(9002,'CARRIER_1',9003,NULL),(9002,'CARRIED',9004,55)")
 
 
 def code_of(excinfo):
@@ -66,9 +70,10 @@ def test_result_time_status_check(fresh_db):
 
 def test_weight_only_on_carried(fresh_db):
     seed(fresh_db)
+    eid = run(fresh_db, "INSERT INTO ENTRY (Entry_Type) VALUES ('Pair')")
     pid = run(fresh_db, "INSERT INTO PERSON (First_Name,Last_Name) VALUES ('A','B')")
     with pytest.raises(pymysql.err.OperationalError) as e:
-        run(fresh_db, "INSERT INTO PARTICIPATES_AS VALUES (9001,'CARRIER_1',%s,50)", (pid,))
+        run(fresh_db, "INSERT INTO PARTICIPATES_AS VALUES (%s,'CARRIER_1',%s,50)", (eid, pid))
     assert code_of(e) == 4025
 
 

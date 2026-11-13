@@ -472,3 +472,246 @@ FROM REGISTRATION reg
 JOIN RACE ra   ON ra.Edition_Year = reg.Edition_Year AND ra.Race_No = reg.Race_No
 JOIN SERIES s  ON s.Series_Code = ra.Series_Code
 LEFT JOIN PARTICIPATES_AS pa ON pa.Entry_ID = reg.Entry_ID AND pa.Role_Code = 'CARRIED';
+
+-- =====================================================================
+-- Triggers: rules that need another table. Each failure raises
+-- SQLSTATE '45000' with a sentence the web application shows as-is.
+-- =====================================================================
+DELIMITER $$
+
+-- Shared check for PARTICIPATES_AS inserts/updates (Phase 1: U4, role shape, age).
+CREATE PROCEDURE check_participation(IN p_entry INT, IN p_role VARCHAR(10), IN p_person INT)
+BEGIN
+    DECLARE v_type VARCHAR(4);
+    DECLARE v_msg VARCHAR(255);
+
+    IF EXISTS (SELECT 1 FROM RESULT res
+               JOIN REGISTRATION reg ON reg.Registration_ID = res.Registration_ID
+               WHERE reg.Entry_ID = p_entry) THEN
+        SIGNAL SQLSTATE '45000'
+            SET MESSAGE_TEXT = 'This entry already has results; its members can no longer change';
+    END IF;
+
+    SELECT Entry_Type INTO v_type FROM ENTRY WHERE Entry_ID = p_entry;
+    IF v_type = 'Pair' AND p_role IN ('CARRIER_2', 'CARRIER_3') THEN
+        SIGNAL SQLSTATE '45000'
+            SET MESSAGE_TEXT = 'Only team entries have carriers 2 and 3';
+    END IF;
+
+    -- the person must meet the age minimum of every series the entry is still registered in
+    SELECT CONCAT(IF(p_role = 'CARRIED', 'Carried person', 'Carrier'), ' must be at least ',
+                  IF(p_role = 'CARRIED', s.Min_Carried_Age, s.Min_Carrier_Age),
+                  ' on race day for series ', s.Series_Code)
+      INTO v_msg
+      FROM REGISTRATION reg
+      JOIN RACE ra   ON ra.Edition_Year = reg.Edition_Year AND ra.Race_No = reg.Race_No
+      JOIN SERIES s  ON s.Series_Code = ra.Series_Code
+      JOIN PERSON p  ON p.Person_ID = p_person
+     WHERE reg.Entry_ID = p_entry AND reg.Cancelled_At IS NULL AND p.Date_of_Birth IS NOT NULL
+       AND TIMESTAMPDIFF(YEAR, p.Date_of_Birth, DATE(ra.Scheduled_Start))
+           < IF(p_role = 'CARRIED', s.Min_Carried_Age, s.Min_Carrier_Age)
+     LIMIT 1;
+    IF v_msg IS NOT NULL THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = v_msg;
+    END IF;
+END$$
+
+CREATE TRIGGER trg_participates_as_bi BEFORE INSERT ON PARTICIPATES_AS
+FOR EACH ROW
+BEGIN
+    CALL check_participation(NEW.Entry_ID, NEW.Role_Code, NEW.Person_ID);
+END$$
+
+CREATE TRIGGER trg_participates_as_bu BEFORE UPDATE ON PARTICIPATES_AS
+FOR EACH ROW
+BEGIN
+    CALL check_participation(NEW.Entry_ID, NEW.Role_Code, NEW.Person_ID);
+END$$
+
+-- Registration window, role shape vs series, age on race day, fee (Phase 1: I1 checks).
+CREATE TRIGGER trg_registration_bi BEFORE INSERT ON REGISTRATION
+FOR EACH ROW
+BEGIN
+    DECLARE v_opens DATE;
+    DECLARE v_deadline DATETIME;
+    DECLARE v_start DATETIME;
+    DECLARE v_fee DECIMAL(8,2);
+    DECLARE v_series VARCHAR(10);
+    DECLARE v_need_carriers TINYINT;
+    DECLARE v_min_carrier TINYINT;
+    DECLARE v_min_carried TINYINT;
+    DECLARE v_carriers INT;
+    DECLARE v_carried INT;
+    DECLARE v_msg VARCHAR(255);
+
+    SELECT Registration_Opens, Registration_Deadline INTO v_opens, v_deadline
+      FROM EDITION WHERE Edition_Year = NEW.Edition_Year;
+    IF NEW.Registered_At < v_opens OR NEW.Registered_At > v_deadline THEN
+        SET v_msg = CONCAT('Cannot register: registration is closed for ', NEW.Edition_Year,
+                           ' (open ', v_opens, ' to ', DATE_FORMAT(v_deadline, '%Y-%m-%d %H:%i'), ')');
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = v_msg;
+    END IF;
+
+    SELECT ra.Scheduled_Start, ra.Entry_Fee_EUR, s.Series_Code, s.Carrier_Count,
+           s.Min_Carrier_Age, s.Min_Carried_Age
+      INTO v_start, v_fee, v_series, v_need_carriers, v_min_carrier, v_min_carried
+      FROM RACE ra JOIN SERIES s ON s.Series_Code = ra.Series_Code
+     WHERE ra.Edition_Year = NEW.Edition_Year AND ra.Race_No = NEW.Race_No;
+
+    SELECT COALESCE(SUM(Role_Code <> 'CARRIED'), 0), COALESCE(SUM(Role_Code = 'CARRIED'), 0)
+      INTO v_carriers, v_carried
+      FROM PARTICIPATES_AS WHERE Entry_ID = NEW.Entry_ID;
+    IF v_carriers <> v_need_carriers OR v_carried <> 1 THEN
+        SET v_msg = CONCAT('Series ', v_series, ' requires ', v_need_carriers,
+                           IF(v_need_carriers = 1, ' carrier', ' carriers'),
+                           ' and 1 carried person; this entry has ', v_carriers, ' and ', v_carried);
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = v_msg;
+    END IF;
+
+    SET v_msg = NULL;
+    SELECT CONCAT(IF(pa.Role_Code = 'CARRIED', 'Carried person', 'Carrier'), ' must be at least ',
+                  IF(pa.Role_Code = 'CARRIED', v_min_carried, v_min_carrier),
+                  ' on race day for series ', v_series, ' (', p.First_Name, ' ', p.Last_Name, ')')
+      INTO v_msg
+      FROM PARTICIPATES_AS pa JOIN PERSON p ON p.Person_ID = pa.Person_ID
+     WHERE pa.Entry_ID = NEW.Entry_ID AND p.Date_of_Birth IS NOT NULL
+       AND TIMESTAMPDIFF(YEAR, p.Date_of_Birth, DATE(v_start))
+           < IF(pa.Role_Code = 'CARRIED', v_min_carried, v_min_carrier)
+     LIMIT 1;
+    IF v_msg IS NOT NULL THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = v_msg;
+    END IF;
+
+    IF NEW.Payment_Status = 'Paid' AND NEW.Fee_Paid_EUR <> v_fee THEN
+        SET v_msg = CONCAT('Fee paid must equal the race entry fee (', v_fee, ' EUR)');
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = v_msg;
+    END IF;
+END$$
+
+-- Cancelling: refused once results exist; releases the bib (Phase 1: U2).
+CREATE TRIGGER trg_registration_bu BEFORE UPDATE ON REGISTRATION
+FOR EACH ROW
+BEGIN
+    IF OLD.Cancelled_At IS NULL AND NEW.Cancelled_At IS NOT NULL THEN
+        IF EXISTS (SELECT 1 FROM RESULT WHERE Registration_ID = OLD.Registration_ID) THEN
+            SIGNAL SQLSTATE '45000'
+                SET MESSAGE_TEXT = 'This registration already has results and cannot be cancelled';
+        END IF;
+        SET NEW.Bib_No = NULL;
+    END IF;
+END$$
+
+-- Results: not for cancelled registrations; stage must fit the series (Phase 1: I2).
+CREATE PROCEDURE check_result(IN p_reg INT, IN p_stage VARCHAR(10))
+BEGIN
+    DECLARE v_cancelled DATETIME;
+    DECLARE v_heats BOOLEAN;
+    DECLARE v_series VARCHAR(10);
+    DECLARE v_msg VARCHAR(255);
+
+    SELECT reg.Cancelled_At, s.Has_Heats, s.Series_Code INTO v_cancelled, v_heats, v_series
+      FROM REGISTRATION reg
+      JOIN RACE ra  ON ra.Edition_Year = reg.Edition_Year AND ra.Race_No = reg.Race_No
+      JOIN SERIES s ON s.Series_Code = ra.Series_Code
+     WHERE reg.Registration_ID = p_reg;
+    IF v_cancelled IS NOT NULL THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'This registration is cancelled; no result can be recorded';
+    END IF;
+    IF NOT v_heats AND p_stage <> 'Single' THEN
+        SET v_msg = CONCAT('Series ', v_series, ' has no heats or final; use stage Single');
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = v_msg;
+    END IF;
+    IF v_heats AND p_stage = 'Single' THEN
+        SET v_msg = CONCAT('Series ', v_series, ' is run in heats and a final; stage Single is not allowed');
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = v_msg;
+    END IF;
+END$$
+
+CREATE TRIGGER trg_result_bi BEFORE INSERT ON RESULT
+FOR EACH ROW
+BEGIN
+    CALL check_result(NEW.Registration_ID, NEW.Stage);
+END$$
+
+CREATE TRIGGER trg_result_bu BEFORE UPDATE ON RESULT
+FOR EACH ROW
+BEGIN
+    CALL check_result(NEW.Registration_ID, NEW.Stage);
+END$$
+
+-- Protests: within 15 minutes of the last finisher; entry must be in the race (Phase 1: I3).
+CREATE TRIGGER trg_protest_bi BEFORE INSERT ON PROTEST
+FOR EACH ROW
+BEGIN
+    DECLARE v_last DATETIME;
+    DECLARE v_msg VARCHAR(255);
+
+    SELECT Last_Finish_At INTO v_last FROM RACE
+     WHERE Edition_Year = NEW.Edition_Year AND Race_No = NEW.Race_No;
+    IF v_last IS NULL THEN
+        SIGNAL SQLSTATE '45000'
+            SET MESSAGE_TEXT = 'This race has not finished yet; protests open after the last finisher';
+    END IF;
+    IF NEW.Filed_At < v_last OR NEW.Filed_At > v_last + INTERVAL 15 MINUTE THEN
+        SET v_msg = CONCAT('A protest must be filed within 15 minutes of the last finisher (',
+                           DATE_FORMAT(v_last, '%H:%i'), ' to ',
+                           DATE_FORMAT(v_last + INTERVAL 15 MINUTE, '%H:%i'), ')');
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = v_msg;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM REGISTRATION
+                   WHERE Entry_ID = NEW.Entry_ID AND Edition_Year = NEW.Edition_Year
+                     AND Race_No = NEW.Race_No AND Cancelled_At IS NULL) THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'The protesting entry is not registered in this race';
+    END IF;
+END$$
+
+-- Awards: the series must offer the prize; a placement prize must match the rank (Phase 1: I4).
+CREATE TRIGGER trg_awarded_bi BEFORE INSERT ON AWARDED
+FOR EACH ROW
+BEGIN
+    DECLARE v_series VARCHAR(10);
+    DECLARE v_heats BOOLEAN;
+    DECLARE v_type VARCHAR(10);
+    DECLARE v_place TINYINT;
+    DECLARE v_rank BIGINT;
+    DECLARE v_msg VARCHAR(255);
+
+    SELECT s.Series_Code, s.Has_Heats INTO v_series, v_heats
+      FROM REGISTRATION reg
+      JOIN RACE ra  ON ra.Edition_Year = reg.Edition_Year AND ra.Race_No = reg.Race_No
+      JOIN SERIES s ON s.Series_Code = ra.Series_Code
+     WHERE reg.Registration_ID = NEW.Registration_ID;
+    IF NOT EXISTS (SELECT 1 FROM OFFERS WHERE Series_Code = v_series AND Prize_ID = NEW.Prize_ID) THEN
+        SET v_msg = CONCAT('Series ', v_series, ' does not offer this prize');
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = v_msg;
+    END IF;
+
+    SELECT Prize_Type, Placement_Rank INTO v_type, v_place FROM PRIZE WHERE Prize_ID = NEW.Prize_ID;
+    IF v_type = 'Placement' THEN
+        SELECT Rank_In_Stage INTO v_rank FROM v_result
+         WHERE Registration_ID = NEW.Registration_ID AND Stage = IF(v_heats, 'Final', 'Single');
+        IF v_rank IS NULL OR v_rank <> v_place THEN
+            SET v_msg = CONCAT('Placement prize for rank ', v_place, ' does not match rank ',
+                               COALESCE(v_rank, 'none'), ' of this registration');
+            SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = v_msg;
+        END IF;
+    END IF;
+END$$
+
+-- Booths: standard prices unless food or custom (market place page; Phase 1 R19).
+CREATE TRIGGER trg_exhibits_at_bi BEFORE INSERT ON EXHIBITS_AT
+FOR EACH ROW
+BEGIN
+    DECLARE v_msg VARCHAR(255);
+    IF NEW.Booth_Size IN ('4x4', '4x8')
+       AND NOT EXISTS (SELECT 1 FROM VENDOR_PRODUCT_CATEGORY
+                       WHERE Vendor_ID = NEW.Vendor_ID AND Category = 'Food')
+       AND NEW.Booth_Fee_EUR <> IF(NEW.Booth_Size = '4x4', 70, 140) THEN
+        SET v_msg = CONCAT('A standard ', NEW.Booth_Size, ' booth costs ',
+                           IF(NEW.Booth_Size = '4x4', 70, 140),
+                           ' EUR (food and custom booths are priced by contract)');
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = v_msg;
+    END IF;
+END$$
+
+DELIMITER ;

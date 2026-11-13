@@ -327,7 +327,7 @@ INSERT INTO PERSON (Person_ID, First_Name, Last_Name, Date_of_Birth, Gender, Ema
   (54, 'Janelle', 'Benedict', '1986-05-14', NULL, NULL),  -- GENERATED: date of birth
   (55, 'Karl', 'Robbins', '1979-08-26', NULL, NULL),  -- GENERATED: date of birth
   (56, 'Erin', 'Kuosmanen', '1998-08-07', NULL, NULL),  -- GENERATED: date of birth
-  (57, 'Taisto', 'Miettinen', '1992-08-09', NULL, NULL),  -- GENERATED: date of birth
+  (57, 'Taisto', 'Miettinen', '1990-08-09', NULL, NULL),  -- GENERATED: date of birth
   (58, 'Katja', 'Kovanen', '1994-11-27', NULL, NULL),  -- GENERATED: date of birth
   (59, 'Vytautas', 'Kirkliauskas', '1981-04-28', NULL, NULL),  -- GENERATED: date of birth
   (60, 'Neringa', 'Kirkliauskiene', '1995-02-03', NULL, NULL),  -- GENERATED: date of birth
@@ -404,7 +404,7 @@ INSERT INTO PERSON (Person_ID, First_Name, Last_Name, Date_of_Birth, Gender, Ema
   (131, 'Janina', 'Filenius-Romppainen', '1990-02-23', NULL, NULL),  -- GENERATED: date of birth
   (132, 'Jani', 'Kumpulehto', '1996-12-15', NULL, NULL),  -- GENERATED: date of birth
   (133, 'Siiri', 'Koskinen', '1995-06-03', NULL, NULL),  -- GENERATED: date of birth
-  (134, 'Joni', 'Juntunen', '1986-07-13', NULL, NULL),  -- GENERATED: date of birth
+  (134, 'Joni', 'Juntunen', '1980-07-13', NULL, NULL),  -- GENERATED: date of birth
   (135, 'Santeri', 'Ilmivalta', '1993-05-18', NULL, NULL),  -- GENERATED: date of birth
   (136, 'Katy', 'Hagstedt', '1996-04-11', NULL, NULL),  -- GENERATED: date of birth
   (137, 'Lumi', 'Hakomäki', '1983-10-03', NULL, NULL),  -- GENERATED: date of birth

@@ -89,7 +89,8 @@ class World:
             first, last = split_name(name)
             p = self.persons[name] = {"id": len(self.persons) + 1, "first": first, "last": last,
                                       "cit": [], "recent": False, "m40_carrier": False,
-                                      "carrier": False, "email": None, "generated": False}
+                                      "carrier": False, "email": None, "generated": False,
+                                      "latest_birth_year": 9999}
         if iso and not p["cit"]:
             p["cit"] = list(reg_2027.CITIZENSHIP_OVERRIDES.get(name, [iso]))
         return p
@@ -130,6 +131,11 @@ class World:
                "cancelled": cancelled_at, "fee": race["fee"],
                "pay": "Refunded" if cancelled_at else "Paid", "note": note}
         self.regs.append(reg)
+        min_age = {"M40": 40}.get(series, 18)
+        for role, name in e["members"]:
+            need = 17 if role == "CARRIED" else min_age
+            p = self.persons[name]
+            p["latest_birth_year"] = min(p["latest_birth_year"], year - need - 1)
         if year >= 2026:
             e["recent"] = True
             for role, name in e["members"]:
@@ -278,6 +284,8 @@ def dob_for(p, name):
         year = 1980 + k % 21
     else:
         year = 1984 + k % 20
+    if year > p["latest_birth_year"]:          # old enough for the person's earliest race
+        year = p["latest_birth_year"] - k % 6
     return f"{year}-{1 + (k // 7) % 12:02d}-{1 + (k // 13) % 28:02d}"
 
 
