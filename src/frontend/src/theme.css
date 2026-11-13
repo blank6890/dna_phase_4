@@ -152,7 +152,7 @@ a:hover { color: var(--orange-dark); }
 .hero p { color: #dbe5f7; }
 .hero__actions { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 1.25rem; }
 .track {
-  border-left: 3px solid var(--cyan); padding-left: 1.25rem;
+  margin: 0;
   font: 500 1.15rem/1.6 var(--font-display); color: #fff;
 }
 .track dt { color: var(--cyan); font-size: 0.95rem; }
@@ -230,7 +230,7 @@ tr.is-out td { color: var(--muted); }
 .record__series { font: 600 1.15rem var(--font-display); color: var(--navy); margin: 0 0 0.35rem; }
 .record p { margin: 0.25rem 0 0; font-size: 0.95rem; }
 
-.stat { border-left: 3px solid var(--cyan); padding: 0.25rem 0 0.25rem 0.9rem; }
+.stat { border-top: 1px solid var(--line); padding: 0.75rem 0 0.25rem; }
 .stat strong { display: block; font: 700 1.8rem/1.1 var(--font-display); color: var(--navy); }
 
 .list-plain { list-style: none; padding: 0; margin: 0; }
@@ -238,8 +238,8 @@ tr.is-out td { color: var(--muted); }
 
 /* ------------------------------------------------------------ alerts and SQL panel */
 .alert { border-radius: var(--radius-s); padding: 0.7rem 0.9rem; margin: 0 0 1rem; max-width: var(--measure); }
-.alert--error { background: #fdecea; color: var(--error); border-left: 4px solid var(--error); }
-.alert--success { background: #e8f5ee; color: var(--ok); border-left: 4px solid var(--ok); }
+.alert--error { background: #fdecea; color: var(--error); }
+.alert--success { background: #e8f5ee; color: var(--ok); }
 
 .sql { margin: 0.75rem 0 0; font-size: 0.9rem; }
 .sql summary { cursor: pointer; color: var(--muted); width: max-content; }
