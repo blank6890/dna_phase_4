@@ -23,10 +23,13 @@ RESULTS_SQL = """
 SELECT v.Rank_In_Stage, v.Bib_No, n.Display_Name, n.Team_Name, n.Countries,
        v.Stage, v.Status, v.Raw_Time_s, v.Penalty_s, v.Net_Time_s, v.Gap_To_Leader_s,
        v.Registration_ID, v.Entry_ID,
-       (SELECT GROUP_CONCAT(CONCAT(pe.Adjustment_Type, ' ', pe.Seconds, ' s: ', pe.Reason)
+       (SELECT GROUP_CONCAT(CONCAT(pe.Adjustment_Type, ' ', CAST(pe.Seconds AS DOUBLE), ' s: ', pe.Reason)
                             ORDER BY pe.Penalty_No SEPARATOR '; ')
           FROM PENALTY pe
-         WHERE pe.Registration_ID = v.Registration_ID AND pe.Stage = v.Stage) AS Adjustments
+         WHERE pe.Registration_ID = v.Registration_ID AND pe.Stage = v.Stage) AS Adjustments,
+       (SELECT GROUP_CONCAT(pe.Penalty_No ORDER BY pe.Penalty_No SEPARATOR ',')
+          FROM PENALTY pe
+         WHERE pe.Registration_ID = v.Registration_ID AND pe.Stage = v.Stage) AS Penalty_Nos
 FROM v_result v
 JOIN v_entry_name n ON n.Entry_ID = v.Entry_ID
 WHERE v.Edition_Year = %s AND v.Series_Code = %s AND (%s IS NULL OR v.Stage = %s)

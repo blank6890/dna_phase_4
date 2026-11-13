@@ -30,6 +30,7 @@ def test_results_main_has_dns_last_and_ranks(client):
 def test_results_team_shows_penalty_and_team(client):
     row = next(r for r in rows(client, "/api/results?year=2026&series=TEAM") if r["Bib_No"] == 105)
     assert row["Team_Name"] == "Team 2 SPOLK" and row["Penalty_s"] == 15.0 and row["Net_Time_s"] == 154.9
+    assert row["Penalty_Nos"] == "1"
 
 
 def test_a1_records(client):
