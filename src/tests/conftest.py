@@ -37,9 +37,16 @@ def connect():
     )
 
 
-@pytest.fixture(scope="session")
+_state = {"dirty": True}
+
+
+@pytest.fixture
 def db_conn():
-    load_scripts()
+    """Read-only tests: a connection to the loaded test DB (reloaded only if a
+    previous test wrote to it)."""
+    if _state["dirty"]:
+        load_scripts()
+        _state["dirty"] = False
     conn = connect()
     yield conn
     conn.close()
@@ -49,7 +56,7 @@ def db_conn():
 def fresh_db():
     """Reload both scripts so a test may write freely; yields a connection."""
     load_scripts()
+    _state["dirty"] = True
     conn = connect()
     yield conn
     conn.close()
-    load_scripts()
