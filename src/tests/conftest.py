@@ -72,3 +72,21 @@ def q(conn, sql, params=()):
 def scalar(conn, sql, params=()):
     rows = q(conn, sql, params)
     return next(iter(rows[0].values())) if rows else None
+
+
+@pytest.fixture
+def client(db_conn):
+    """Flask test client on the loaded (read-only) test database."""
+    from app import create_app
+    app = create_app()
+    app.testing = True
+    return app.test_client()
+
+
+@pytest.fixture
+def wclient(fresh_db):
+    """Flask test client for tests that write (database reloaded first)."""
+    from app import create_app
+    app = create_app()
+    app.testing = True
+    return app.test_client()
