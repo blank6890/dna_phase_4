@@ -33,7 +33,7 @@
 
 1. **Accented or apostrophe names** (Föhr, Jäntti, Sõbrad, Donncha O’Callaghan) must round-trip and be searchable. Test: Q1 search `föhr` finds Timo Föhr (Task 6).
 2. **Search input with `%` or `_`** must be matched literally, not return every row. Test: `q=%` returns 0 persons (Task 6).
-3. **Missing or non-numeric query params** (`year=abc`, no `series`) must return 400 with a message, not a 500. Test: `/api/results?year=abc` → 400 (Task 5).
+3. **Missing or non-numeric query params** (`year=abc`, no `series`) must return 400 with a message, not a 500. Test: `/api/results?year=abc` → 400 (Task 6).
 4. **Two registrations racing for the same bib** must produce a readable 409, not a traceback. Test: duplicate bib → 409 "Bib number already used in this edition" (Task 8).
 5. **Tied net times** must share a rank and have equal gaps. Test: 2026 Main bibs 41, 34 and 40 all have rank 17 (Task 3).
 
@@ -157,9 +157,10 @@ Verify: `mariadb -uphase4 -pphase4 -e "SELECT VERSION()"` prints `13.0.2-MariaDB
 - **Last_Finish_At** is set for every 2026 race. 2027 races have it NULL.
 - **Officials:** generated, 8 people. One is `Duty_Title='Chief Judge'` and supervises the rest; the others are 2 jury members, 2 timekeepers, 1 starter and 2 info desk.
 - **Protests (2026):**
-  - P1: Upheld. Team 105 contests its penalty. Its penalty is not removed in the data; the text explains it's illustrative.
-  - P2: Rejected (Main).
-  - P3 and P4: **Pending** (Main and M40).
+  - P1: Rejected (Main).
+  - P2: Upheld (M40; a timing query already reflected in the data).
+  - P3: **Pending**, Team 105 contesting its +15 s penalty (this drives the U3 demo).
+  - P4: **Pending** (Main).
   - All have `Filed_At` within 15 min of `Last_Finish_At`, and decided ones have 3 votes.
 - **Awards (2026):** top 3 in each series' deciding stage, plus three Weekend specials.
 - **Vendors:** 8 generated vendors. 2026 bookings are all paid. 2027 has 3 unpaid bookings, one of them the vendor's only booking, for the D3 demo.
@@ -446,7 +447,7 @@ def test_refund_rule(fresh_db):  # cancel a 2027 registration now -> 45.00
   - `test_u1_correct_time_reranks_and_reawards`: set the 2026 Main bib 49 raw time to 60.0 → `v_result` rank 1 for bib 49, rank 2 for bib 62; the Winner prize now belongs to bib 49's registration; Recorded_By_Official_ID == the given official.
   - `test_u1_penalty_changes_net`: add a 10 s penalty to Sprint final bib 78 → net 43.77 and bib 70 becomes rank 1.
   - `test_i3_protest_in_window`: `filed_at = Last_Finish_At + 5 min` → 200; at +20 min → 409.
-  - `test_u3_uphold_removes_penalty`: decide protest P1 Upheld with `remove_penalty` on Team 105's penalty → Team 105's net == 139.9; votes stored; Outcome Upheld with Decided_At set.
+  - `test_u3_uphold_removes_penalty`: decide pending protest P3 Upheld with `remove_penalty` on Team 105's penalty → Team 105's net == 139.9; votes stored; Outcome Upheld with Decided_At set.
   - `test_u3_reject`: → Outcome Rejected; results unchanged.
   - `test_i4_award_not_offered` → 409 "does not offer".
 
@@ -478,7 +479,7 @@ def test_refund_rule(fresh_db):  # cancel a 2027 registration now -> 45.00
 ### Task 11: Frontend scaffold, theme, shared components, Flask serving
 
 **Files:**
-- Create: `src/frontend/` via `npm create vite@6 frontend -- --template react` (then pin `react@18.3.1`, `react-dom@18.3.1`, `react-router-dom@6.28.0`)
+- Create: `src/frontend/` via `npm create vite@6 frontend -- --template react` (then pin `react@18.3.1`, `react-dom@18.3.1`, `react-router-dom@6.28.0`, and dev-dependency `vitest@2.1.8`)
 - Create: `src/frontend/src/{main.jsx, App.jsx, api.js, theme.css}` and `components/{Layout.jsx, SqlPanel.jsx, DataTable.jsx, Alert.jsx, YearSelect.jsx, SeriesTabs.jsx, formatTime.js}`
 - Modify: `src/frontend/vite.config.js` (proxy `/api` → `http://localhost:5000`, `build.outDir: 'dist'`), `src/app.py` (serve `frontend/dist`, with SPA fallback to `index.html` for non-`/api` paths)
 - Test: `src/frontend/src/components/formatTime.test.js` (vitest), `src/tests/test_spa.py`
