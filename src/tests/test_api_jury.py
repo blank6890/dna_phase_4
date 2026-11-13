@@ -54,13 +54,13 @@ def test_i2_duplicate_stage_refused(wclient, fresh_db):
 
 
 def test_u1_correct_time_reranks_and_reawards(wclient, fresh_db):
-    tk = official(wclient)
     rid = reg_id(fresh_db, 2026, 49)
-    r = wclient.patch(f"/api/results/{rid}/Single", json={"raw_time_s": 60.0, "official_id": tk})
+    r = wclient.patch(f"/api/results/{rid}/Single", json={"raw_time_s": 60.0})
     assert r.status_code == 200, r.get_json()
     assert rank(fresh_db, 2026, 49, "Single") == 1 and rank(fresh_db, 2026, 62, "Single") == 2
     assert winner_bib(fresh_db, 2026, 1) == 49
-    assert scalar(fresh_db, "SELECT Recorded_By_Official_ID FROM RESULT WHERE Registration_ID=%s", (rid,)) == tk
+    matti = scalar(fresh_db, "SELECT Person_ID FROM STAFF_ACCOUNT WHERE Username='matti'")   # logged-in official
+    assert scalar(fresh_db, "SELECT Recorded_By_Official_ID FROM RESULT WHERE Registration_ID=%s", (rid,)) == matti
 
 
 def test_u1_penalty_changes_net(wclient, fresh_db):

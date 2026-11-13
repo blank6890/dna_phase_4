@@ -52,3 +52,46 @@ def test_cookie_from_other_secret_is_401(anon):
     c2 = other.test_client()
     c2.set_cookie("session", anon.get_cookie("session").value)
     assert c2.get("/api/auth/me").status_code == 401
+
+
+STAFF_ROUTES = [
+    ("GET", "/api/registrations?year=2026&series=MAIN"), ("GET", "/api/protests?status=Pending"),
+    ("GET", "/api/editions/2026/persons"), ("GET", "/api/editions/2026/heaviest-carried"),
+    ("GET", "/api/reports/medals"), ("GET", "/api/reports/registrations-by-country?year=2026"),
+    ("GET", "/api/entries/unregistered"), ("GET", "/api/officials"), ("GET", "/api/prizes?series=MAIN"),
+    ("DELETE", "/api/registrations/1"), ("DELETE", "/api/entries/1"),
+    ("POST", "/api/results"), ("PATCH", "/api/results/1/Single"), ("POST", "/api/penalties"),
+    ("POST", "/api/protests"), ("POST", "/api/protests/1/decide"), ("POST", "/api/awards"),
+    ("DELETE", "/api/booths/8/2027"),
+]
+
+
+@pytest.mark.parametrize("method,url", STAFF_ROUTES)
+def test_staff_route_needs_login(anon, method, url):
+    r = anon.open(url, method=method, json={})
+    assert r.status_code == 401 and r.get_json()["error"] == "Staff login required"
+
+
+PUBLIC_ROUTES = ["/api/editions", "/api/results?year=2026&series=MAIN", "/api/records", "/api/champions",
+                 "/api/grand-prix", "/api/entries?year=2027&series=MAIN", "/api/teams",
+                 "/api/search/persons?q=ta", "/api/vendors", "/api/editions/2027/booths"]
+
+
+@pytest.mark.parametrize("url", PUBLIC_ROUTES)
+def test_public_reads_need_no_login(anon, url):
+    assert anon.get(url).status_code == 200
+
+
+def test_manage_my_registration_needs_no_login(wanon, fresh_db):
+    rid = scalar(fresh_db, "SELECT Registration_ID FROM REGISTRATION WHERE Edition_Year=2027 AND Bib_No=20")
+    assert wanon.get(f"/api/registrations/{rid}").status_code == 200
+    assert wanon.post(f"/api/registrations/{rid}/cancel").status_code == 200
+
+
+def test_result_official_comes_from_session(wclient, fresh_db):
+    matti = scalar(fresh_db, "SELECT Person_ID FROM STAFF_ACCOUNT WHERE Username='matti'")
+    rid = scalar(fresh_db, "SELECT Registration_ID FROM REGISTRATION WHERE Edition_Year=2026 AND Bib_No=49")
+    r = wclient.patch(f"/api/results/{rid}/Single", json={"raw_time_s": 60.0, "official_id": matti + 1})
+    assert r.status_code == 200, r.get_json()
+    assert scalar(fresh_db, "SELECT Recorded_By_Official_ID FROM RESULT WHERE Registration_ID=%s AND Stage='Single'",
+                  (rid,)) == matti

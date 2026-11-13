@@ -148,13 +148,12 @@ def _race_of(cur, reg):
     return row["Edition_Year"], row["Race_No"]
 
 
-def record_result(payload):
+def record_result(payload, official):
     """I2: result (+ optional penalties) for one registration and stage; triggers check the rules."""
     reg = as_int(payload.get("registration_id"), "registration_id", minimum=1)
     stage = as_choice(payload.get("stage"), "stage", STAGES)
     status = as_choice(payload.get("status"), "status", STATUSES)
     raw = _time_for(status, as_float(payload.get("raw_time_s"), "raw_time_s", required=False, maximum=3600))
-    official = as_int(payload.get("official_id"), "official_id", minimum=1)
     penalties = [_penalty(p) for p in (payload.get("penalties") or [])]
     with db.transaction() as cur:
         year, race_no = _race_of(cur, reg)
@@ -165,10 +164,9 @@ def record_result(payload):
     return (INSERT_RESULT_SQL, INSERT_PENALTY_SQL, *prizes.REASSIGN_SQLS)
 
 
-def correct_result(reg, stage, payload):
+def correct_result(reg, stage, payload, official):
     """U1: correct a time or status; ranks follow from v_result, placement prizes are re-assigned."""
     stage = as_choice(stage, "stage", STAGES)
-    official = as_int(payload.get("official_id"), "official_id", minimum=1)
     with db.transaction() as cur:
         cur.execute(CURRENT_RESULT_SQL, (reg, stage))
         current = cur.fetchone()
@@ -185,11 +183,10 @@ def correct_result(reg, stage, payload):
     return (UPDATE_RESULT_SQL, *prizes.REASSIGN_SQLS)
 
 
-def add_penalty(payload):
+def add_penalty(payload, official):
     """U1: add a time penalty / bonus / warning to a result."""
     reg = as_int(payload.get("registration_id"), "registration_id", minimum=1)
     stage = as_choice(payload.get("stage"), "stage", STAGES)
-    official = as_int(payload.get("official_id"), "official_id", minimum=1)
     kind, seconds, reason = _penalty(payload)
     with db.transaction() as cur:
         year, race_no = _race_of(cur, reg)

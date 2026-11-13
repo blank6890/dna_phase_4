@@ -117,6 +117,7 @@ def register_public_routes(app: Flask) -> None:
 
 def register_desk_routes(app: Flask) -> None:
     @app.get("/api/registrations")
+    @staff_required
     def api_registrations():                             # S1
         year = parse_int("year")
         series = parse_choice("series", results.SERIES)
@@ -124,17 +125,20 @@ def register_desk_routes(app: Flask) -> None:
         return respond(rows, sql)
 
     @app.get("/api/protests")
+    @staff_required
     def api_protests():                                  # S2 with status=Pending
         status = parse_choice("status", protests.OUTCOMES, required=False)
         rows, sql = protests.list_protests(status)
         return respond(rows, sql)
 
     @app.get("/api/editions/<int:year>/persons")
+    @staff_required
     def api_edition_persons(year):                       # P1
         rows, sql = registrations.persons_in_edition(year)
         return respond(rows, sql)
 
     @app.get("/api/editions/<int:year>/heaviest-carried")
+    @staff_required
     def api_heaviest(year):                              # A5
         rows, sql = registrations.heaviest_carried(year)
         return respond(rows, sql)
@@ -154,6 +158,7 @@ def register_desk_routes(app: Flask) -> None:
     }
 
     @app.get("/api/reports/<name>")
+    @staff_required
     def api_report(name):
         if name in simple_reports:
             rows, sql = simple_reports[name]()
@@ -186,16 +191,19 @@ def register_registration_routes(app: Flask) -> None:
         return done("Member replaced", *sqls, person_id=person_id)
 
     @app.delete("/api/registrations/<int:reg_id>")
+    @staff_required
     def api_delete_registration(reg_id):                 # D1
         sqls = registrations.delete(reg_id)
         return done("Registration deleted", *sqls)
 
     @app.get("/api/entries/unregistered")
+    @staff_required
     def api_unregistered():
         rows, sql = registrations.unregistered_entries()
         return respond(rows, sql)
 
     @app.delete("/api/entries/<int:entry_id>")
+    @staff_required
     def api_delete_entry(entry_id):                      # D2
         sql = registrations.delete_entry(entry_id)
         return done("Entry deleted", sql)
@@ -203,44 +211,53 @@ def register_registration_routes(app: Flask) -> None:
 
 def register_jury_routes(app: Flask) -> None:
     @app.get("/api/officials")
+    @staff_required
     def api_officials():
         rows, sql = results.officials()
         return respond(rows, sql)
 
     @app.post("/api/results")
+    @staff_required
     def api_record_result():                             # I2
-        return done("Result recorded", *results.record_result(body()))
+        return done("Result recorded", *results.record_result(body(), current_official_id()))
 
     @app.patch("/api/results/<int:reg_id>/<stage>")
+    @staff_required
     def api_correct_result(reg_id, stage):               # U1
         return done("Result corrected; ranks and placement prizes updated",
-                    *results.correct_result(reg_id, stage, body()))
+                    *results.correct_result(reg_id, stage, body(), current_official_id()))
 
     @app.post("/api/penalties")
+    @staff_required
     def api_add_penalty():                               # U1
-        return done("Penalty added; ranks and placement prizes updated", *results.add_penalty(body()))
+        return done("Penalty added; ranks and placement prizes updated", *results.add_penalty(body(), current_official_id()))
 
     @app.post("/api/protests")
+    @staff_required
     def api_file_protest():                              # I3
         protest_id, sql = protests.file_protest(body())
         return done(f"Protest {protest_id} filed", sql, protest_id=protest_id)
 
     @app.post("/api/protests/<int:protest_id>/decide")
+    @staff_required
     def api_decide_protest(protest_id):                  # U3
         return done("Protest decided", *protests.decide(protest_id, body()))
 
     @app.get("/api/prizes")
+    @staff_required
     def api_prizes():
         rows, sql = prizes.for_series(parse_choice("series", results.SERIES))
         return respond(rows, sql)
 
     @app.delete("/api/booths/<int:vendor_id>/<int:year>")
+    @staff_required
     def api_remove_booth(vendor_id, year):               # D3
         vendor_deleted, sqls = vendors.remove_booking(vendor_id, year)
         message = "Booking removed" + (" and vendor deleted (no other bookings)" if vendor_deleted else "")
         return done(message, *sqls, vendor_deleted=vendor_deleted)
 
     @app.post("/api/awards")
+    @staff_required
     def api_award():                                     # I4
         return done("Prize awarded", prizes.award(body()))
 
