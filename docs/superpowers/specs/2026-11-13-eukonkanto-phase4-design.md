@@ -16,7 +16,7 @@ Success means:
 4. A1 (world records) and S3 (2026 Sprint final) reproduce what eukonkanto.fi shows.
 5. The README covers everything the brief asks for (paradigm/versions, stack, Design Changes, setup, numbered feature list in demo order). `DEMO.md` gives a video script.
 
-Out of scope: login/authentication, deployment, the video recording and zip packaging (the student does these), and the features Phase 1 lists as out of scope (web shop, tickets, accommodation, news, accreditation).
+Out of scope: login/authentication (added later: see `2026-11-13-staff-login-design.md`), deployment, the video recording and zip packaging (the student does these), and the features Phase 1 lists as out of scope (web shop, tickets, accommodation, news, accreditation).
 
 ## 2. Stack
 

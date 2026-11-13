@@ -35,6 +35,7 @@ the weak entities (RACE, RESULT, PENALTY) and the ternary PARTICIPATES_AS are un
 | 8 | New `UNIQUE (Edition_Year, Series_Code)` on RACE | Phase 1 rule "at most one race per series per edition" |
 | 9 | Fixed-domain VARCHARs become ENUM/CHECK (Entry_Type, Payment_Status, result Status, Stage, Adjustment_Type, Outcome, Vote, Prize_Type, Prize_Scope, Booth_Size, Category, Duty, Championship_Level, Gender, Continent); other type refinements: `Bib_No SMALLINT`, `Certified_Since SMALLINT`, `Event_Month_Year DATE` (first day of the month) | Phase 1/2 defined these domains; Phase 3 left them as free text |
 | 10 | `OFFICIAL.Person_ID`, `OFFICIAL.Supervisor_ID` and `PARTICIPATES_AS.Role_Code` foreign keys are `RESTRICT` (not CASCADE/SET NULL) | MariaDB forbids a CHECK on a column whose FK has a cascading action (error 1901); those columns carry CHECKs (supervisor ≠ self, weight only for the carried role) |
+| 11 | New `STAFF_ACCOUNT (Person_ID → OFFICIAL, Username UNIQUE, Password_Hash)`, one row per official | The Staff Desk now requires a login per official, so the server knows who recorded each result |
 
 **Kept as in Phase 3:** registration status is derived from `Cancelled_At` (no stored Status column);
 QUALIFIES stays as Phase 3's nullable `ENTRY.GP_Event_ID`; there is no protest-fee column (150 € is a
@@ -76,7 +77,7 @@ business rule, used as a constant in the income report).
 **Generated (every such row ends with `-- GENERATED:` in `populate.sql`):**
 - Birth dates of recent competitors (each meets its series' age rules) and the carried people's
   weights (a few under 49 kg).
-- 8 officials, 4 protests and their votes, 2026 special prizes, 9 market vendors and their bookings,
+- 8 officials and their Staff Desk logins, 4 protests and their votes, 2026 special prizes, 9 market vendors and their bookings,
   e-mail addresses for 2027 registrants, and edition dates other than 2026/2027.
 - Sprint and Team champion times, which are not published; they are always slower than the official record.
 - One cancelled registration and one entry with no registration, for the demos.
@@ -122,6 +123,22 @@ Credentials come from the environment variables `DB_HOST`, `DB_USER`, `DB_PASS` 
 (defaults: `localhost`, `phase4`, `phase4`, `eukonkanto_db`; see `src/config.py`).
 For frontend development, run `npm run dev` in `src/frontend` (port 5173, proxies `/api` to Flask).
 
+**Staff login.** The Staff Desk pages (`/desk/...`) and their API routes need a login; without one the
+API answers `401 Staff login required`. Each official has an account (generated demo data, password
+stored only as a hash):
+
+| Username | Official | Password |
+|---|---|---|
+| `matti` | Matti Hyvönen, Chief Judge | `staff2027` |
+| `riitta`, `juha` | Jury Members | `staff2027` |
+| `anne`, `pekka` | Timekeepers | `staff2027` |
+| `jari` | Starter | `staff2027` |
+| `sari`, `minna` | Info Desk Officers | `staff2027` |
+
+The session cookie is signed with `SECRET_KEY` from the environment. If it is unset, a random key is
+made at start-up, so restarting the server logs everyone out. Results and penalties are stored with the
+logged-in official as recorder. Public pages, registering and "Manage my registration" need no login.
+
 **Tests:**
 - Backend: `cd src && pytest`. It rebuilds the separate `eukonkanto_test` database from the two
   scripts, so `eukonkanto_db` is untouched.
@@ -132,8 +149,8 @@ Every page has a **Show SQL** panel with the exact parameterised SQL the backend
 ## Features
 
 The order matches the demo video: writes first, then reads. The Staff Desk pages
-(`/desk/...`) stand in for the organiser, jury and committee screens that Phase 1 describes. There
-is no login; anyone running the app locally acts as staff.
+(`/desk/...`) stand in for the organiser, jury and committee screens that Phase 1 describes. They
+need a staff login (see "Staff login" above).
 
 **Insert, update and delete**
 
@@ -157,16 +174,16 @@ is no login; anyone running the app locally acts as staff.
 5. **Delete an entry with no registrations (D2):** Organiser, "Entries with no registrations", "Delete entry".
    - Its roles and countries cascade; the people stay.
    - The foreign key refuses entries that are still registered.
-6. **Remove an unpaid booth booking (D3):** Market Place (`/market`), booth bookings, "Remove booking".
+6. **Remove an unpaid booth booking (D3):** Staff Desk › Organiser, "Market booth bookings", "Remove booking".
    - Only unpaid bookings before the event.
    - The vendor is deleted too when it has no other booking.
-7. **Record a result (I2):** Staff Desk › Jury (`/desk/jury`). Choose the acting official and the
-   race, then use "Record a result".
+7. **Record a result (I2):** Staff Desk › Jury (`/desk/jury`). Choose the race, then use "Record a
+   result". The logged-in official is stored as recorder.
    - Inserts the RESULT.
    - Triggers refuse a cancelled registration or a stage the series does not have.
 8. **Correct a time or add a penalty (U1):** Jury, "Edit time" or "Add penalty" on a result.
    - Ranks and gaps update everywhere, because they come from `v_result`.
-   - Placement prizes for that race are re-assigned in the same transaction, and the official is stored as recorder.
+   - Placement prizes for that race are re-assigned in the same transaction, and the logged-in official is stored as recorder.
 9. **File a protest (I3):** Jury, "File a protest". Choose the entry, the time and the reason.
    - The trigger requires the time to be within 15 minutes of the race's last finisher and the entry to have raced.
 10. **Decide a protest (U3):** Jury, "Pending protests", "Record decision".
@@ -194,7 +211,7 @@ is no login; anyone running the app locally acts as staff.
     name and the organisation it represents.
 18. **Find vendors (Q4):** Market Place, "Find a vendor". Part of the business name and/or a product
     category (Food, Handicrafts, Local specialities).
-19. **Booth size and fee per vendor (P3):** Market Place, booth bookings for the chosen edition.
+19. **Booth size and fee per vendor (P3):** Market Place, booth bookings for the chosen edition (read-only; the Organiser desk has the same table with "Remove booking").
 20. **Registrations for one race (S1):** Organiser, choose the edition and series tab. Complete
     registration rows: bib, entry, time registered, payment, refund, backpack.
 21. **People registered in an edition (P1):** Organiser, "Everyone registered in <year>". First name,

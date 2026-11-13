@@ -51,6 +51,13 @@ JOIN PERSON p USING (Person_ID) WHERE pa.Entry_ID = (SELECT Entry_ID FROM REGIST
 - Optionally try Replace on registration 31 (a 2026 entry): no Replace button is offered, and the
   database would refuse it with "already has results".
 
+**Staff login (before step 4)**
+- **Terminal:** `curl -i -X DELETE http://localhost:5000/api/registrations/172` answers
+  `401` with "Staff login required": the API itself refuses staff actions without a login.
+- **UI:** open Staff Desk › Organiser: the page sends you to the login page. A wrong password shows
+  "Wrong username or password". Log in as `anne` / `staff2027` (Anne Ryynänen, Timekeeper); the menu now
+  shows the desk pages and "Log out (Anne Ryynänen)".
+
 **4. Delete a registration that never ran (D1)**
 ```sql
 SELECT Registration_ID, Bib_No FROM REGISTRATION WHERE Registration_ID IN (31, 172);
@@ -74,7 +81,8 @@ SELECT COUNT(*) FROM PERSON WHERE Last_Name IN ('Korhonen', 'Nurmi');
 SELECT v.Vendor_ID, v.Business_Name, x.Edition_Year, x.Paid FROM VENDOR v
 LEFT JOIN EXHIBITS_AT x USING (Vendor_ID) WHERE v.Vendor_ID IN (2, 8) ORDER BY 1, 3;
 ```
-- **UI:** Market Place, booth bookings 2027.
+- **UI:** Staff Desk › Organiser, Market booth bookings, edition 2027. (The public Market Place shows
+  the same table with no remove button.)
   - Remove Retkeilijän Grilli: the page says the vendor was deleted, because it had no other booking.
   - Remove Savon Käsityöpaja: the vendor is kept because of its 2026 booking.
 - **After:** vendor 8 is gone; vendor 2 has only its 2026 row.
@@ -84,7 +92,7 @@ LEFT JOIN EXHIBITS_AT x USING (Vendor_ID) WHERE v.Vendor_ID IN (2, 8) ORDER BY 1
 SELECT * FROM v_result WHERE Registration_ID = 167;
 ```
 - **UI:** Staff Desk › Jury.
-  1. Acting official: Anne Ryynänen (Timekeeper). Edition 2027, Sprint, Heat 1.
+  1. The toolbar shows "Recording as Anne Ryynänen". Edition 2027, Sprint, Heat 1.
   2. Record a result for bib 70: Finished, 36.12.
   3. Show a refused case: in 2026 World Championship, recording a "Heat" is not offered, and the
      database rejects it with "has no heats".
@@ -99,7 +107,7 @@ WHERE r.Edition_Year = 2026 AND r.Race_No = 5 AND a.Prize_ID IN (1, 3);
 ```
 - **UI:** Jury, edition 2026, World Championship, Edit time on bib 49: 60.0, Save.
 - **After:** bib 49 is rank 1 and bib 62 rank 2. The champion's prize (1) moved to bib 49, and the
-  recorder is the acting official.
+  recorder is Anne, the logged-in official (`Recorded_By_Official_ID` 239).
 
 **9. File a protest (I3)**
 ```sql
