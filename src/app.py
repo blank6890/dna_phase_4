@@ -7,7 +7,9 @@ from pathlib import Path
 from flask import Flask, send_from_directory
 
 import db
+from auth import current_official_id, register_auth_routes, staff_required
 from api import ApiError, body, done, parse_choice, parse_int, parse_str, register_error_handlers, respond
+from config import get_secret_key
 from repo import people, prizes, protests, registrations, reports, results, vendors
 
 
@@ -17,6 +19,8 @@ DEFAULT_DIST = Path(__file__).resolve().parent / "frontend" / "dist"
 def create_app(frontend_dist: Path | None = None) -> Flask:
     app = Flask(__name__, static_folder=None)
     app.json.sort_keys = False
+    app.secret_key = get_secret_key()
+    app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
     register_error_handlers(app)
     register_frontend(app, Path(frontend_dist or DEFAULT_DIST))
 
@@ -25,6 +29,7 @@ def create_app(frontend_dist: Path | None = None) -> Flask:
         sql = "SELECT DATABASE() AS db"
         return respond(db.query(sql), sql)
 
+    register_auth_routes(app)
     register_public_routes(app)
     register_desk_routes(app)
     register_registration_routes(app)

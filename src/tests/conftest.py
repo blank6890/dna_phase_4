@@ -74,19 +74,41 @@ def scalar(conn, sql, params=()):
     return next(iter(rows[0].values())) if rows else None
 
 
-@pytest.fixture
-def client(db_conn):
-    """Flask test client on the loaded (read-only) test database."""
+STAFF = ("matti", "staff2027")      # seeded demo login (Chief Judge)
+
+
+def _app_client():
     from app import create_app
     app = create_app()
     app.testing = True
     return app.test_client()
+
+
+def _logged_in(c):
+    r = c.post("/api/auth/login", json={"username": STAFF[0], "password": STAFF[1]})
+    assert r.status_code == 200, r.get_json()
+    return c
+
+
+@pytest.fixture
+def anon(db_conn):
+    """Flask test client on the loaded (read-only) test database, not logged in."""
+    return _app_client()
+
+
+@pytest.fixture
+def wanon(fresh_db):
+    """Flask test client for tests that write (database reloaded first), not logged in."""
+    return _app_client()
+
+
+@pytest.fixture
+def client(db_conn):
+    """Read-only test client, logged in as staff."""
+    return _logged_in(_app_client())
 
 
 @pytest.fixture
 def wclient(fresh_db):
-    """Flask test client for tests that write (database reloaded first)."""
-    from app import create_app
-    app = create_app()
-    app.testing = True
-    return app.test_client()
+    """Writing test client, logged in as staff."""
+    return _logged_in(_app_client())
