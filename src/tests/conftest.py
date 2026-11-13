@@ -60,3 +60,15 @@ def fresh_db():
     conn = connect()
     yield conn
     conn.close()
+
+
+def q(conn, sql, params=()):
+    """Run a query on `conn` and return all rows (dicts)."""
+    with conn.cursor() as cur:
+        cur.execute(sql, params or None)   # None: no %-interpolation (literal % in LIKE)
+        return cur.fetchall()
+
+
+def scalar(conn, sql, params=()):
+    rows = q(conn, sql, params)
+    return next(iter(rows[0].values())) if rows else None

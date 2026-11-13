@@ -398,3 +398,77 @@ CREATE TABLE EXHIBITS_AT (
         ON DELETE RESTRICT ON UPDATE CASCADE,
     CONSTRAINT ck_exhibits_at_fee CHECK (Booth_Fee_EUR >= 0)
 ) ENGINE=InnoDB;
+
+-- =====================================================================
+-- Views: derived attributes are computed, never stored
+-- =====================================================================
+
+-- Display_Name: "Carrier1[, Carrier2, Carrier3] / Carried"; Countries: ISO codes the entry represents.
+CREATE VIEW v_entry_name AS
+SELECT e.Entry_ID,
+       e.Entry_Type,
+       e.Team_Name,
+       e.Represented_Organisation,
+       CONCAT(
+           GROUP_CONCAT(CASE WHEN pa.Role_Code <> 'CARRIED'
+                             THEN CONCAT_WS(' ', p.First_Name, NULLIF(p.Last_Name, '')) END
+                        ORDER BY ro.Leg_Order SEPARATOR ', '),
+           ' / ',
+           MAX(CASE WHEN pa.Role_Code = 'CARRIED'
+                    THEN CONCAT_WS(' ', p.First_Name, NULLIF(p.Last_Name, '')) END)
+       ) AS Display_Name,
+       (SELECT GROUP_CONCAT(rp.ISO_Code ORDER BY rp.ISO_Code SEPARATOR '/')
+          FROM REPRESENTS rp WHERE rp.Entry_ID = e.Entry_ID) AS Countries
+FROM ENTRY e
+JOIN PARTICIPATES_AS pa ON pa.Entry_ID = e.Entry_ID
+JOIN PERSON p           ON p.Person_ID = pa.Person_ID
+JOIN ROLE ro            ON ro.Role_Code = pa.Role_Code
+GROUP BY e.Entry_ID, e.Entry_Type, e.Team_Name, e.Represented_Organisation;
+
+-- Net_Time_s = raw + penalties - bonuses; Rank_In_Stage and Gap_To_Leader_s among finishers
+-- of the same race and stage (ties share a rank).
+CREATE VIEW v_result AS
+WITH adj AS (
+    SELECT Registration_ID, Stage,
+           SUM(CASE Adjustment_Type WHEN 'Penalty' THEN Seconds
+                                    WHEN 'Bonus'   THEN -Seconds ELSE 0 END) AS Penalty_s
+    FROM PENALTY
+    GROUP BY Registration_ID, Stage
+), base AS (
+    SELECT res.Registration_ID, res.Stage, reg.Edition_Year, reg.Race_No, ra.Series_Code,
+           reg.Entry_ID, reg.Bib_No, res.Status, res.Raw_Time_s,
+           COALESCE(adj.Penalty_s, 0) AS Penalty_s,
+           CASE WHEN res.Status = 'Finished' THEN res.Raw_Time_s + COALESCE(adj.Penalty_s, 0) END AS Net_Time_s,
+           res.Recorded_By_Official_ID
+    FROM RESULT res
+    JOIN REGISTRATION reg ON reg.Registration_ID = res.Registration_ID
+    JOIN RACE ra          ON ra.Edition_Year = reg.Edition_Year AND ra.Race_No = reg.Race_No
+    LEFT JOIN adj         ON adj.Registration_ID = res.Registration_ID AND adj.Stage = res.Stage
+)
+SELECT base.*,
+       CASE WHEN Status = 'Finished' THEN
+            RANK() OVER (PARTITION BY Edition_Year, Race_No, Stage, (Status = 'Finished') ORDER BY Net_Time_s)
+       END AS Rank_In_Stage,
+       CASE WHEN Status = 'Finished' THEN
+            Net_Time_s - MIN(Net_Time_s) OVER (PARTITION BY Edition_Year, Race_No, Stage)
+       END AS Gap_To_Leader_s
+FROM base;
+
+-- Status from Cancelled_At; Refund_EUR = fee - 10 EUR when cancelled >= 30 days before the race;
+-- Required_Backpack_kg = max(0, series minimum - carried person's measured weight).
+CREATE VIEW v_registration AS
+SELECT reg.Registration_ID, reg.Bib_No, reg.Registered_At, reg.Cancelled_At, reg.Payment_Status,
+       reg.Fee_Paid_EUR, reg.Entry_ID, reg.Edition_Year, reg.Race_No,
+       ra.Series_Code,
+       ra.Scheduled_Start AS Race_Start,
+       IF(reg.Cancelled_At IS NULL, 'Registered', 'Cancelled') AS Status,
+       CASE WHEN reg.Cancelled_At IS NOT NULL
+                 AND reg.Cancelled_At <= ra.Scheduled_Start - INTERVAL 30 DAY
+            THEN GREATEST(reg.Fee_Paid_EUR - 10, 0) ELSE 0 END AS Refund_EUR,
+       pa.Measured_Weight_kg AS Carried_Weight_kg,
+       CASE WHEN pa.Measured_Weight_kg IS NOT NULL
+            THEN GREATEST(0, s.Min_Carried_Weight_kg - pa.Measured_Weight_kg) END AS Required_Backpack_kg
+FROM REGISTRATION reg
+JOIN RACE ra   ON ra.Edition_Year = reg.Edition_Year AND ra.Race_No = reg.Race_No
+JOIN SERIES s  ON s.Series_Code = ra.Series_Code
+LEFT JOIN PARTICIPATES_AS pa ON pa.Entry_ID = reg.Entry_ID AND pa.Role_Code = 'CARRIED';
